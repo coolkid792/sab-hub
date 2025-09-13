@@ -18,7 +18,7 @@ local Config = {
 
     Webhooks = {
         Default   = "https://discord.com/api/webhooks/1416445464210833470/qna4mXFxVvsQQs9N8DNzgFmzleRr_OlS0oJ0AlwS2A0op5lDAMY0aHjiDu9u3h6EYxzu",
-        HighValue = "https://discord.com/api/webhooks/1416445464210833470/qna4mXFxVvsQQs9N8DNzgFmzleRr_OlS0oJ0AlwS2A0op5lDAMY0aHjiDu9u3h6EYxzu",
+        HighValue = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Kkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX",
         Debug     = "https://discord.com/api/webhooks/1413717796122001418/-l-TEBCuptznTy7EiNnyQXSfuj4ASgcNMCtQnEIwSaQbEdsdqgcVIE1owi1VSVVa1a6H"
     },
 
