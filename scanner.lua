@@ -126,7 +126,7 @@ local function processPodium(podium)
             {name="📜 Income", value=gen, inline=true},
             {name="👥 Player Count", value=playerCount, inline=true},
             {name="✨ Rarity", value=rarityValue, inline=true},
-            {name="🆔 Job ID", value=jobId},
+            {name="🆔 Job ID", value="```"..jobId.."```"},
             {name="💻 Join Script", value="```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance("..PlaceID..", \""..jobId.."\", game.Players.LocalPlayer)\n```"},
             {name="🔗 Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"},
         },
