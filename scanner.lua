@@ -210,7 +210,7 @@ local startTime = tick()
 local function getServers()
     local servers, cursor = {}, ""
     repeat
-        local url = "https://games.roblox.com/v1/games/"..Config.PlaceID.."/servers/Public?sortOrder=Asc&limit=100"
+        local url = "https://games.roblox.com/v1/games/"..Config.PlaceID.."/servers/Public?sortOrder=Asc&limit=10"
         if cursor ~= "" then url = url .. "&cursor=" .. cursor end
         local success, response = pcall(function() return game:HttpGet(url) end)
         if success and response and response ~= "" then
