@@ -103,13 +103,25 @@ function Notifier:getPlayerData()
 end
 
 function Notifier:sendOnce(webhookKey, embed)
-    local id = Util.jsonEncode({ description = embed.description, fields = embed.fields })
+    -- Unique deduplication ID includes webhook key to separate channels
+    local id = Util.jsonEncode({
+        webhook    = webhookKey,
+        description= embed.description,
+        fields     = embed.fields
+    })
+
+    -- If we've already sent this exact embed to this webhook, skip it
     if self.sentMessages[id] then return end
     self.sentMessages[id] = true
-    task.delay(120, function() self.sentMessages[id] = nil end)
+
+    -- Expire after 2 minutes to allow fresh scans later
+    task.delay(120, function()
+        self.sentMessages[id] = nil
+    end)
 
     Util.request(Config.Webhooks[webhookKey], Embed.build(embed))
 end
+
 
 function Notifier:handlePodium(podium)
     if not podium or not podium.Parent then return end
