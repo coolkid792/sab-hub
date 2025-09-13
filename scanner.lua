@@ -1,10 +1,10 @@
 --// Services
-local Players          = game:GetService("Players")
-local TeleportService  = game:GetService("TeleportService")
-local HttpService      = game:GetService("HttpService")
-local Workspace        = game:GetService("Workspace")
-local RunService       = game:GetService("RunService")
-local Lighting         = game:GetService("Lighting")
+local Players           = game:GetService("Players")
+local TeleportService   = game:GetService("TeleportService")
+local HttpService       = game:GetService("HttpService")
+local Workspace         = game:GetService("Workspace")
+local RunService        = game:GetService("RunService")
+local Lighting          = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
@@ -17,8 +17,8 @@ local Config = {
     FPSCap    = 25,
 
     Webhooks = {
-        Default   = "https://discord.com/api/webhooks/1413509205415170058/MIAXe3Xyt_gNhvRlaPALmEy6jWtD1Y6D6Q9SDdlzGdRGXyPnUDekeg_bGyF5-Js5aJde",
-        HighValue = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Kkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX",
+        Default   = "https://discord.com/api/webhooks/1416445464210833470/qna4mXFxVvsQQs9N8DNzgFmzleRr_OlS0oJ0AlwS2A0op5lDAMY0aHjiDu9u3h6EYxzu",
+        HighValue = "https://discord.com/api/webhooks/1416445464210833470/qna4mXFxVvsQQs9N8DNzgFmzleRr_OlS0oJ0AlwS2A0op5lDAMY0aHjiDu9u3h6EYxzu",
         Debug     = "https://discord.com/api/webhooks/1413717796122001418/-l-TEBCuptznTy7EiNnyQXSfuj4ASgcNMCtQnEIwSaQbEdsdqgcVIE1owi1VSVVa1a6H"
     },
 
@@ -122,20 +122,19 @@ function Notifier:sendOnce(webhookKey, embed)
     Util.request(Config.Webhooks[webhookKey], Embed.build(embed))
 end
 
-
 function Notifier:handlePodium(podium)
     if not podium or not podium.Parent then return end
 
     local overhead = podium:FindFirstChild("AnimalOverhead", true)
     if not overhead then return end
 
-    local nameObj = overhead:FindFirstChild("DisplayName")
-    local genObj = overhead:FindFirstChild("Generation")
+    local nameObj   = overhead:FindFirstChild("DisplayName")
+    local genObj    = overhead:FindFirstChild("Generation")
     local rarityObj = overhead:FindFirstChild("Rarity")
     if not (nameObj and genObj and rarityObj) then return end
 
     -- Mutation lookup
-    local mutationObj = overhead:FindFirstChild("Mutation")
+    local mutationObj  = overhead:FindFirstChild("Mutation")
     local mutationText = "None"
     if mutationObj and mutationObj.Visible then
         mutationText = mutationObj.Text or "None"
@@ -191,7 +190,7 @@ local function processPodium(podium)
     notifier:handlePodium(podium)
 end
 
-local function scanPlots()
+function scanPlots()
     local plotsFolder = Workspace:FindFirstChild("Plots")
     if not plotsFolder then return end
     for _, playerBase in ipairs(plotsFolder:GetChildren()) do
@@ -214,10 +213,11 @@ Workspace.Plots.ChildAdded:Connect(function(newBase)
 end)
 
 ----------------------------------------------------------------------------------------------------
---// Server Hopping
+--// Server Hopping + Dynamic Rescans
 ----------------------------------------------------------------------------------------------------
 local isTeleporting = false
 local startTime = tick()
+local hopDelayTask
 
 local function getServers()
     local servers, cursor = {}, ""
@@ -277,12 +277,42 @@ end
 TeleportService.TeleportInitFailed:Connect(function(player)
     if player == LocalPlayer then
         isTeleporting = false
-        task.wait(5)
+        task.wait(2)
         hopToNewServer()
     end
 end)
 
-task.delay(10, hopToNewServer)
+-- Dynamic rescan + hop scheduling
+local function rescanAndHop()
+    print("Rescan and hop triggered (player join or initial)")
+    -- cancel pending hop
+    if hopDelayTask then
+        print("Cancelling previous hop task")
+        task.cancel(hopDelayTask)
+        hopDelayTask = nil
+    end
+
+    -- run scan immediately
+    print("Scanning plots now")
+    scanPlots()
+
+    -- always reschedule hop 10s later
+    print("Scheduling server hop in 10 seconds")
+    hopDelayTask = task.delay(10, function()
+        print("Executing server hop")
+        hopToNewServer()
+    end)
+end
+
+-- Whenever ANY player joins, cancel hop, rescan, and restart 10s timer
+Players.PlayerAdded:Connect(function(player)
+    rescanAndHop()
+end)
+
+-- Initial timer: wait 10s after spawn, then do rescan+hop
+task.delay(2, function()
+    rescanAndHop()
+end)
 
 ----------------------------------------------------------------------------------------------------
 --// FPS / Rendering Optimizations
