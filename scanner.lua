@@ -26,7 +26,12 @@ pcall(function()
 end)
 
 --// Prevent duplicate messages
-local function SendMessageEMBED(url, embed)
+--// Prevent duplicate messages
+local function SendMessageEMBED(...)
+    local args = {...}
+    local embed = args[#args]  -- last argument is always embed
+    local urls = table.pack(table.unpack(args, 1, #args - 1)) -- everything except last
+
     local messageId = HttpService:JSONEncode({
         description = embed.description,
         fields = embed.fields
@@ -56,15 +61,18 @@ local function SendMessageEMBED(url, embed)
 
     local body = HttpService:JSONEncode(data)
 
-    pcall(function()
-        request({
-            Url = url,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = body
-        })
-    end)
+    for _, url in ipairs(urls) do
+        pcall(function()
+            request({
+                Url = url,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = body
+            })
+        end)
+    end
 end
+
 
 --// Send plain text (zzzHub)
 local function SendMessagePlain(url, brainrotData)
@@ -179,9 +187,7 @@ local function processPodium(podium)
 
     else
         embed.color = 0xFFFFFF
-        SendMessageEMBED(webhookUrl, embed)
-        
-        SendMessageEMBED(zzzHubWebhook, embed)
+        SendMessageEMBED(webhookUrl, zzzHubWebhook, embed)
     end
 end
 
