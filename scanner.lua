@@ -19,24 +19,22 @@ local sentMessages = {}
 local webhookUrl = "https://discord.com/api/webhooks/1413509205415170058/MIAXe3Xyt_gNhvRlaPALmEy6jWtD1Y6D6Q9SDdlzGdRGXyPnUDekeg_bGyF5-Js5aJde"
 local highValueWebhookUrl = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Kkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX"
 local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l-TEBCuptznTy7EiNnyQXSfuj4ASgcNMCtQnEIwSaQbEdsdqgcVIE1owi1VSVVa1a6H"
+local zzzHubWebhook = "https://discord.com/api/webhooks/1416769053854273618/lZrD5zONPCvR1Rm7YcDRv6u8IZ2CUEbR8VYkDJe9DOaoQ6QtnNw7-zgrN5QkcAQmF0WZ"
 
 pcall(function()
-    setfpscap(25) -- change 30 to whatever cap you want
+    setfpscap(25)
 end)
 
 --// Prevent duplicate messages
 local function SendMessageEMBED(url, embed)
-    -- Create a unique identifier for this embed
     local messageId = HttpService:JSONEncode({
         description = embed.description,
         fields = embed.fields
     })
 
-    -- Skip if already sent recently
     if sentMessages[messageId] then return end
     sentMessages[messageId] = true
 
-    -- Expire after 120 seconds
     task.delay(120, function()
         sentMessages[messageId] = nil
     end)
@@ -57,6 +55,32 @@ local function SendMessageEMBED(url, embed)
     end
 
     local body = HttpService:JSONEncode(data)
+
+    pcall(function()
+        request({
+            Url = url,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = body
+        })
+    end)
+end
+
+--// Send plain text (zzzHub)
+local function SendMessagePlain(url, brainrotData)
+    local message = string.format(
+        "Brainrot Name: %s\nGeneration: %s\nPlayer Count: %s\nRarity: %s\nJob ID: %s\nJoin Script:\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%d, \"%s\", game.Players.LocalPlayer)\n\nJoin Link: %s",
+        brainrotData.name,
+        brainrotData.gen,
+        brainrotData.playerCount,
+        brainrotData.rarity,
+        brainrotData.jobId,
+        PlaceID,
+        brainrotData.jobId,
+        brainrotData.joinLink
+    )
+
+    local body = HttpService:JSONEncode({content = message})
 
     pcall(function()
         request({
@@ -103,12 +127,10 @@ local function processPodium(podium)
     local gen = tostring(generation.Text)
     local rarityValue = tostring(rarity.Text)
 
-    -- Unique brain key
     local key = name .. "|" .. gen .. "|" .. rarityValue .. "|" .. game.JobId
     if sentBrains[key] then return end
     sentBrains[key] = true
 
-    -- Parse gen number
     local numberMatch = gen:match("(%d+%.?%d*)")
     local genNumber = tonumber(numberMatch) or 0
     if string.find(gen, "M", 1, true) then
@@ -136,6 +158,15 @@ local function processPodium(podium)
         ping = false
     }
 
+    local brainrotData = {
+        name = name,
+        gen = gen,
+        playerCount = playerCount,
+        rarity = rarityValue,
+        jobId = jobId,
+        joinLink = jobId=="N/A" and "N/A" or joinLink
+    }
+
     if genNumber >= 10000000 then
         embed.color = 0xFF0000
         embed.ping = true
@@ -148,6 +179,9 @@ local function processPodium(podium)
         embed.color = 0xFFFFFF
         SendMessageEMBED(webhookUrl, embed)
     end
+
+    -- also send plain text
+    SendMessagePlain(zzzHubWebhook, brainrotData)
 end
 
 local function scanPlots()
@@ -296,21 +330,19 @@ local function clearEffects(obj)
     end
 end
 
---// Clean up workspace (delete everything except path to Plots)
+--// Clean up workspace
 local function preservePathToPlots()
     local plots = Workspace:FindFirstChild("Plots")
     if not plots then return end
 
-    -- Build a set of objects we must preserve
     local preserve = {}
     local obj = plots
     while obj and obj ~= Workspace do
         preserve[obj] = true
         obj = obj.Parent
     end
-    preserve[Workspace] = true -- never delete workspace itself
+    preserve[Workspace] = true
 
-    -- Delete everything not in preserve
     for _, child in ipairs(Workspace:GetChildren()) do
         if not preserve[child] then
             child:Destroy()
