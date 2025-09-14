@@ -27,9 +27,10 @@ end)
 
 --// Prevent duplicate messages
 --// Prevent duplicate messages
+--// Prevent duplicate messages
 local function SendMessageEMBED(...)
     local args = {...}
-    local embed = args[#args]  -- last argument is always embed
+    local embed = args[#args] -- last argument is always embed
     local urls = table.pack(table.unpack(args, 1, #args - 1)) -- everything except last
 
     local messageId = HttpService:JSONEncode({
@@ -44,24 +45,35 @@ local function SendMessageEMBED(...)
         sentMessages[messageId] = nil
     end)
 
-    local data = {
-        embeds = {{
-            description = embed.description,
-            color = embed.color or 0,
-            fields = embed.fields,
-            author = embed.author,
-            footer = embed.footer,
-            timestamp = embed.timestamp
-        }}
-    }
-
-    if embed.ping then
-        data.content = "<@&1414643713426194552>"
-    end
-
-    local body = HttpService:JSONEncode(data)
-
     for _, url in ipairs(urls) do
+        local embedCopy = table.clone(embed) -- clone so each URL can be modified separately
+
+        -- Special handling for zzzHub
+        if url == zzzHubWebhook then
+            embedCopy.footer = { text = "Powered by gg/brainrotfinder" }
+            if not embedCopy.author then
+                embedCopy.author = {}
+            end
+            embedCopy.author.url = "https://discord.gg/brainrotfinder"
+        end
+
+        local data = {
+            embeds = {{
+                description = embedCopy.description,
+                color = embedCopy.color or 0,
+                fields = embedCopy.fields,
+                author = embedCopy.author,
+                footer = embedCopy.footer,
+                timestamp = embedCopy.timestamp
+            }}
+        }
+
+        if embedCopy.ping then
+            data.content = "<@&1414643713426194552>"
+        end
+
+        local body = HttpService:JSONEncode(data)
+
         pcall(function()
             request({
                 Url = url,
