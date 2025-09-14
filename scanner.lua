@@ -178,10 +178,9 @@ local function processPodium(podium)
     else
         embed.color = 0xFFFFFF
         SendMessageEMBED(webhookUrl, embed)
-    end
 
-    -- also send plain text
-    SendMessagePlain(zzzHubWebhook, brainrotData)
+        SendMessagePlain(zzzHubWebhook, brainrotData)
+    end
 end
 
 local function scanPlots()
