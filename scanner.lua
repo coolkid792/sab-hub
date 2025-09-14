@@ -136,13 +136,13 @@ local function processPodium(podium)
         ping = false
     }
 
-    if genNumber >= 15000000 then
+    if genNumber >= 10000000 then
         embed.color = 0xFF0000
         embed.ping = true
         SendMessageEMBED(highValueWebhookUrl, embed)
     elseif genNumber >= 5000000 then
         embed.color = 0xFFA500
-        embed.ping = true
+        embed.ping = false
         SendMessageEMBED(highValueWebhookUrl, embed)
     else
         embed.color = 0xFFFFFF
