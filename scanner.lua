@@ -180,15 +180,8 @@ local function processPodium(podium)
     else
         embed.color = 0xFFFFFF
         SendMessageEMBED(webhookUrl, embed)
-
-        -- Special footer for zzzHubWebhook
-        local zzzEmbed = table.clone(embed)
-        zzzEmbed.footer = {
-            text = "Powered by .gg/brainrotfinder",
-            icon_url = "https://media.discordapp.net/attachments/1415892824385388625/1416849947403227268/puzzlelogoenw.png?ex=68c857d7&is=68c70657&hm=86b7009fe5f73860db95183cdd43c5bbafa774734fc2f51368b553dd8b4da355&=&format=webp&quality=lossless&width=750&height=750"
-        }
-
-        SendMessageEMBED(zzzHubWebhook, zzzEmbed)
+        
+        SendMessageEMBED(zzzHubWebhook, embed)
     end
 end
 
