@@ -1,14 +1,15 @@
 --// Services
 local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 
 --// Variables
 local PlaceID = game.PlaceId
+local visited = {}
 local isTeleporting = false
 local startTime = tick()
 local processedPodiums = {}
@@ -25,13 +26,172 @@ pcall(function()
     setfpscap(25)
 end)
 
---// Prevent duplicate messages
---// Prevent duplicate messages
+--// Executor HTTP request helper
+local function httpRequestExecutor(url, method, headers, body)
+    local reqFunc = request or http_request or syn.request
+    if not reqFunc then
+        warn("[HOP DEBUG] No executor HTTP request function found!")
+        return nil
+    end
+
+    local req = {
+        Url = url,
+        Method = method or "GET",
+        Headers = headers or {},
+        Body = body
+    }
+
+    local ok, res = pcall(reqFunc, req)
+    if not ok then
+        warn("[HOP DEBUG] HTTP request failed:", res)
+        return nil
+    end
+
+    if type(res) == "table" then
+        return res
+    elseif type(res) == "string" then
+        return {Body = res, StatusCode = 200, Success = true}
+    else
+        return nil
+    end
+end
+
+--// Fetch JSON with retries & rate-limit handling
+local function getJsonExecutor(url, maxRetries)
+    maxRetries = maxRetries or 3
+
+    while maxRetries > 0 do
+        local res = httpRequestExecutor(url, "GET", {["Accept"]="application/json"})
+        if not res then
+            warn("[HOP DEBUG] HTTP request returned nil, retrying...")
+            maxRetries = maxRetries - 1
+            task.wait(1)
+        else
+            if res.StatusCode == 429 then
+                local retryAfter = tonumber(res.Headers and (res.Headers["retry-after"] or res.Headers["Retry-After"])) or 15
+                print("[HOP DEBUG] 429 rate limit detected, waiting "..retryAfter.."s")
+                task.wait(retryAfter)
+                maxRetries = maxRetries - 1
+            elseif res.StatusCode ~= 200 then
+                warn("[HOP DEBUG] HTTP error "..res.StatusCode)
+                task.wait(1)
+                maxRetries = maxRetries - 1
+            else
+                if not res.Body or res.Body == "" then
+                    warn("[HOP DEBUG] Empty response body")
+                    return nil
+                end
+                local ok, json = pcall(function() return HttpService:JSONDecode(res.Body) end)
+                if ok then return json
+                else
+                    warn("[HOP DEBUG] Failed to decode JSON. Body snippet:", string.sub(res.Body,1,200))
+                    return nil
+                end
+            end
+        end
+    end
+
+    warn("[HOP DEBUG] Exhausted retries for:", url)
+    return nil
+end
+
+--// Fetch multiple pages and pick fullest joinable server
+local function fetchJoinableServer()
+    local servers = {}
+    local cursor = ""
+    repeat
+        local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100"):format(PlaceID)
+        if cursor ~= "" then url = url.."&cursor="..cursor end
+
+        local data = getJsonExecutor(url)
+        if not data or not data.data then
+            print("[HOP DEBUG] No server data returned, stopping pagination.")
+            break
+        end
+
+        for _, s in ipairs(data.data) do
+            if s.playing < s.maxPlayers and s.id ~= game.JobId and not visited[s.id] then
+                table.insert(servers, s)
+            end
+        end
+
+        cursor = data.nextPageCursor or ""
+    until cursor == "" or #servers >= 50 -- limit cached servers
+
+    if #servers == 0 then
+        print("[HOP DEBUG] No joinable servers found.")
+        return nil
+    end
+
+    -- Pick server with highest player count
+    table.sort(servers, function(a,b) return a.playing > b.playing end)
+    local target = servers[1]
+    return target
+end
+
+--// Hop to a new server
+local function hopToNewServer()
+    if isTeleporting then return end
+    isTeleporting = true
+
+    local targetServer = fetchJoinableServer()
+    if not targetServer then
+        isTeleporting = false
+        print("[HOP DEBUG] No available servers. Retrying in 2s...")
+        task.wait(2)
+        return hopToNewServer()
+    end
+
+    visited[targetServer.id] = true
+    print(string.format("[HOP DEBUG] Hopping to server ID: %s | %d/%d players",
+        targetServer.id, targetServer.playing, targetServer.maxPlayers))
+
+    local teleportStarted = tick()
+    local teleportTimeout = 12
+
+    task.spawn(function()
+        while isTeleporting do
+            if tick() - teleportStarted > teleportTimeout then
+                print("[HOP DEBUG] Teleport stuck, retrying...")
+                isTeleporting = false
+                hopToNewServer()
+                break
+            end
+            task.wait(1)
+        end
+    end)
+
+    local success, err = pcall(function()
+        task.wait(0.5)
+        TeleportService:TeleportToPlaceInstance(PlaceID, targetServer.id, LocalPlayer)
+    end)
+
+    if success then
+        print("[HOP DEBUG] Teleport request sent successfully.")
+    else
+        warn("[HOP DEBUG] Teleport failed:", err)
+        isTeleporting = false
+        task.wait(1)
+        hopToNewServer()
+    end
+end
+
+TeleportService.TeleportInitFailed:Connect(function(player)
+    if player == LocalPlayer then
+        isTeleporting = false
+        print("[HOP DEBUG] Teleport failed, retrying in 0.5s...")
+        task.wait(0.5)
+        hopToNewServer()
+    end
+end)
+
+task.delay(17.5, hopToNewServer)
+
 --// Prevent duplicate messages
 local function SendMessageEMBED(...)
     local args = {...}
-    local embed = args[#args] -- last argument is always embed
-    local urls = table.pack(table.unpack(args, 1, #args - 1)) -- everything except last
+    local embed = args[#args]
+    local urls = table.pack(table.unpack(args, 1, #args - 1))
 
     local messageId = HttpService:JSONEncode({
         description = embed.description,
@@ -46,14 +206,10 @@ local function SendMessageEMBED(...)
     end)
 
     for _, url in ipairs(urls) do
-        local embedCopy = table.clone(embed) -- clone so each URL can be modified separately
-
-        -- Special handling for zzzHub
+        local embedCopy = table.clone(embed)
         if url == zzzHubWebhook then
-            embedCopy.footer = { text = "Powered by gg/brainrotfinder" }
-            if not embedCopy.author then
-                embedCopy.author = {}
-            end
+            embedCopy.footer = { text = "zzz hub x gg/brainrotfinder" }
+            if not embedCopy.author then embedCopy.author = {} end
             embedCopy.author.url = "https://discord.gg/brainrotfinder"
         end
 
@@ -68,9 +224,7 @@ local function SendMessageEMBED(...)
             }}
         }
 
-        if embedCopy.ping then
-            data.content = "<@&1414643713426194552>"
-        end
+        if embedCopy.ping then data.content = "<@&1414643713426194552>" end
 
         local body = HttpService:JSONEncode(data)
 
@@ -84,7 +238,6 @@ local function SendMessageEMBED(...)
         end)
     end
 end
-
 
 --// Send plain text (zzzHub)
 local function SendMessagePlain(url, brainrotData)
@@ -191,19 +344,16 @@ local function processPodium(podium)
         embed.color = 0xFF0000
         embed.ping = true
         SendMessageEMBED(highValueWebhookUrl, embed)
-
     elseif genNumber >= 5000000 then
         embed.color = 0xFFA500
-        embed.ping = false
         SendMessageEMBED(highValueWebhookUrl, embed)
-
     else
         embed.color = 0xFFFFFF
         SendMessageEMBED(webhookUrl, zzzHubWebhook, embed)
     end
 end
 
-
+--// Scan plots
 local function scanPlots()
     local plotsFolder = Workspace:FindFirstChild("Plots")
     if not plotsFolder then return end
@@ -226,74 +376,10 @@ Workspace.Plots.ChildAdded:Connect(function(newBase)
     end
 end)
 
---// Server hopping
-local function getServers()
-    local servers, cursor = {}, ""
-    repeat
-        local url = "https://games.roblox.com/v1/games/"..PlaceID.."/servers/Public?sortOrder=Asc&limit=100"
-        if cursor ~= "" then url = url.."&cursor="..cursor end
-        local success, response = pcall(function() return game:HttpGet(url) end)
-        if success and response and response ~= "" then
-            local decodeSuccess, data = pcall(function() return HttpService:JSONDecode(response) end)
-            if decodeSuccess and data and data.data then
-                for _, server in pairs(data.data) do
-                    if tonumber(server.playing)
-                    and tonumber(server.maxPlayers)
-                    and tonumber(server.playing) < tonumber(server.maxPlayers)
-                    and server.id ~= game.JobId then
-                        table.insert(servers, server)
-                    end
-                end
-                cursor = data.nextPageCursor or ""
-            else break end
-        else break end
-    until cursor == "" or #servers > 0
-    return servers
-end
-
-local function hopToNewServer()
-    if isTeleporting then return end
-    isTeleporting = true
-    local servers = getServers()
-    if #servers == 0 then
-        isTeleporting = false
-        task.wait(5)
-        return hopToNewServer()
-    end
-
-    local targetServer = servers[math.random(1,#servers)]
-    local success, err = pcall(function()
-        TeleportService:TeleportToPlaceInstance(PlaceID, targetServer.id, LocalPlayer)
-    end)
-
-    local elapsedTime = math.floor(tick()-startTime)
-    local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId="..LocalPlayer.UserId.."&width=150&height=150&format=png"
-    local color = elapsedTime>300 and 0xFF0000 or 0xFFFFFF
-
-    if success then
-        SendMessageEMBED(debugWebhookUrl, {
-            description="**"..LocalPlayer.Name.."** hopped servers after ⏰ "..elapsedTime.."s.",
-            color=color,
-            timestamp=os.date("!%Y-%m-%dT%H:%M:%S.000Z"),
-            author={name=LocalPlayer.Name, icon_url=avatarUrl}
-        })
-        isTeleporting=false
-    else
-        isTeleporting=false
-        task.wait(5)
-        hopToNewServer()
-    end
-end
-
-TeleportService.TeleportInitFailed:Connect(function(player)
-    if player==LocalPlayer then
-        isTeleporting=false
-        task.wait(5)
-        hopToNewServer()
-    end
+--// Scan every time a player joins
+Players.PlayerAdded:Connect(function(player)
+    task.delay(0.5, scanPlots)
 end)
-
-task.delay(10, hopToNewServer)
 
 --// White overlay screen
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
@@ -350,7 +436,6 @@ local function clearEffects(obj)
     end
 end
 
---// Clean up workspace
 local function preservePathToPlots()
     local plots = Workspace:FindFirstChild("Plots")
     if not plots then return end
