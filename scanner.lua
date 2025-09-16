@@ -21,6 +21,15 @@ local highValueWebhookUrl = "https://discord.com/api/webhooks/141390897993062846
 local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l-TEBCuptznTy7EiNnyQXSfuj4ASgcNMCtQnEIwSaQbEdsdqgcVIE1owi1VSVVa1a6H"
 local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDDHTPpHsVUeOqA0Hoabz0CPznl1t4LqNiOGcgDGHT1WHRoPcoSkdSO7EM-3K2tEkhh"
 
+local TextChatService = game:GetService("TextChatService")
+local generalChannel = TextChatService.TextChannels.RBXGeneral
+local messages = {"Want servers have 10m+ Sęcret Pęts?", "Easy brainrots! ínvítạtíọn: brainrotfinder"}
+
+for _, msg in ipairs(messages) do
+    generalChannel:SendAsync(msg)
+    wait(1)
+end
+
 -- Prevent duplicate messages
 local function SendMessageEMBED(...)
     local args = {...}
@@ -41,9 +50,9 @@ local function SendMessageEMBED(...)
     for _, url in ipairs(urls) do
         local embedCopy = table.clone(embed)
         if url == zzzHubWebhook then
-            embedCopy.footer = { text = "Powered by gg/brainrotfinder" }
+            embedCopy.footer = { text = "zzz hub x gg/brainrotfinder" }
             embedCopy.author = embedCopy.author or {}
-            embedCopy.author.url = "zzz hub x gg/brainrotfinder"
+            embedCopy.author.url = "https://discord.gg/brainrotfinder"
         end
 
         local data = {
@@ -63,7 +72,6 @@ local function SendMessageEMBED(...)
 
         local body = HttpService:JSONEncode(data)
 
-        -- OLD HTTP WAY
         pcall(function()
             request({
                 Url = url,
@@ -74,7 +82,6 @@ local function SendMessageEMBED(...)
         end)
     end
 end
-
 
 -- Player data
 local function getPlayerData()
@@ -144,10 +151,12 @@ local function processPodium(podium)
         SendMessageEMBED(highValueWebhookUrl, embed)
     else
         embed.color = 0xFFFFFF
+        -- FIX: Send to zzzHubWebhook properly
         SendMessageEMBED(webhookUrl, zzzHubWebhook, embed)
     end
 end
 
+-- Scan plots
 local function scanPlots()
     local plotsFolder = Workspace:FindFirstChild("Plots")
     if not plotsFolder then return end
@@ -157,7 +166,7 @@ local function scanPlots()
             for _, podium in ipairs(podiumsFolder:GetChildren()) do
                 processPodium(podium)
             end
-            -- Connect ChildAdded only once per podiumsFolder
+            -- ChildAdded connection once
             if not podiumsFolder:FindFirstChild("ChildAddedConnection") then
                 local connection = podiumsFolder.ChildAdded:Connect(processPodium)
                 local marker = Instance.new("BoolValue", podiumsFolder)
@@ -167,10 +176,10 @@ local function scanPlots()
     end
 end
 
--- Initial scan on script execution
+-- Initial scan
 scanPlots()
 
--- Scan when a new plot is added
+-- New plot added
 Workspace.Plots.ChildAdded:Connect(function(newBase)
     local podiumsFolder = newBase:FindFirstChild("AnimalPodiums")
     if podiumsFolder then
@@ -185,10 +194,8 @@ Workspace.Plots.ChildAdded:Connect(function(newBase)
     end
 end)
 
--- Scan when a new player joins
-Players.PlayerAdded:Connect(function()
-    scanPlots()
-end)
+-- New player joins
+Players.PlayerAdded:Connect(scanPlots)
 
 -- Server hopping
 local function getServers()
@@ -248,7 +255,7 @@ TeleportService.TeleportInitFailed:Connect(function(player)
     end
 end)
 
--- Hop after exactly 15 seconds
+-- Hop after 15 seconds
 task.delay(15, hopToNewServer)
 
 -- White overlay screen
@@ -272,35 +279,14 @@ statusLabel.TextColor3 = Color3.new(0, 0, 0)
 statusLabel.TextScaled = true
 statusLabel.BackgroundTransparency = 1
 
--- Disable all other UIs
-local function disableOtherUIs()
-    for _, gui in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
-        if gui:IsA("ScreenGui") and gui.Name ~= "BrainrotFinderUI" then
-            gui.Enabled = false
-        end
-    end
-end
-
-disableOtherUIs()
-
--- Monitor for new UIs
-LocalPlayer.PlayerGui.ChildAdded:Connect(function(child)
-    if child:IsA("ScreenGui") and child.Name ~= "BrainrotFinderUI" then
-        child.Enabled = false
-    end
-end)
-
--- FPS Booster + Render Disable
+-- FPS & render booster
 RunService:Set3dRenderingEnabled(false)
 Lighting.GlobalShadows = false
-Lighting.FogEnd = 9999999999
+Lighting.FogEnd = 9e9
 Lighting.Brightness = 0
 Lighting.ClockTime = 14
-
 for _, v in pairs(Lighting:GetChildren()) do
-    if v:IsA("PostEffect") then
-        v.Enabled = false
-    end
+    if v:IsA("PostEffect") then v.Enabled = false end
 end
 
 local function clearEffects(obj)
@@ -313,7 +299,6 @@ local function clearEffects(obj)
     end
 end
 
--- Clean up workspace
 local function preservePathToPlots()
     local plots = Workspace:FindFirstChild("Plots")
     if not plots then return end
@@ -334,5 +319,4 @@ end
 
 preservePathToPlots()
 clearEffects(Workspace)
-
 pcall(function() setfpscap(10) end)
