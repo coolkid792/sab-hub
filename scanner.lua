@@ -27,16 +27,21 @@ local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDD
 -- Debug helper
 local function SendDebug(msg)
     print("[DEBUG]", msg)
-    pcall(function()
-        HttpService:RequestAsync({
+    local success, err = pcall(function()
+        local data = {
+            content = "[DEBUG] " .. msg
+        }
+        request({
             Url = debugWebhookUrl,
             Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({content="[DEBUG] "..msg})
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(data)
         })
     end)
+    if not success then
+        warn("[DEBUG ERROR] Failed to send webhook: " .. tostring(err))
+    end
 end
-
 -- Working Embed Sender
 local function SendMessageEMBED(...)
     local args = {...}
