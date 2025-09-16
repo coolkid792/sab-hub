@@ -1,4 +1,4 @@
--- Optimized Brainrot Finder with persistent retry teleport logic
+-- Optimized Brainrot Finder with randomized server hopping and fast retry
 
 -- Services
 local TeleportService = game:GetService("TeleportService")
@@ -112,7 +112,6 @@ local function processPodium(podium)
     local name, gen, rarityValue = displayName.Text, generation.Text, rarity.Text
     local key = name.."|"..gen.."|"..rarityValue.."|"..game.JobId
 
-    -- IMPOSSIBLE duplicate check
     if sentBrainsGlobal[key] then return end
     sentBrainsGlobal[key] = true
 
@@ -243,12 +242,11 @@ local function getServers()
         attempt = attempt+1
         task.wait(0.5*attempt)
     until cursor=="" or #servers>0 or attempt>maxAttempts
-    table.sort(servers,function(a,b) return tonumber(a.playing)>tonumber(b.playing) end)
     SendDebug("Fetched "..#servers.." joinable servers")
     return servers
 end
 
--- Server hopping with retry logic
+-- Server hopping with random selection & fast retry
 local function hopToNewServer()
     if isTeleporting then SendDebug("Already teleporting") return end
     isTeleporting = true
@@ -262,7 +260,9 @@ local function hopToNewServer()
         end
     end
 
-    for _,server in ipairs(currentServerList) do
+    while #currentServerList > 0 do
+        local idx = math.random(1, #currentServerList)
+        local server = currentServerList[idx]
         if not failedServerIds[server.id] and serverRetryCounts[server.id] < 5 then
             serverRetryCounts[server.id] = serverRetryCounts[server.id] + 1
             local success, err = pcall(function()
@@ -275,10 +275,11 @@ local function hopToNewServer()
                 teleportFailureCount = teleportFailureCount + 1
                 SendDebug("Teleport failed: "..tostring(err))
                 failedServerIds[server.id] = true
-                task.spawn(function() task.wait(30) failedServerIds[server.id] = nil end)
-                task.wait(0.2)
+                task.spawn(function() task.wait(1) failedServerIds[server.id] = nil end)
+                task.wait(1) -- retry quickly
             end
         end
+        table.remove(currentServerList, idx)
     end
 
     currentServerList = {}
@@ -293,9 +294,9 @@ TeleportService.TeleportInitFailed:Connect(function(player, result, errorMessage
     isTeleporting = false
     if jobId and type(jobId)=="string" then
         failedServerIds[jobId] = true
-        task.spawn(function() task.wait(30) failedServerIds[jobId] = nil end)
+        task.spawn(function() task.wait(1) failedServerIds[jobId] = nil end)
     end
-    task.wait(0.2)
+    task.wait(1)
     hopToNewServer()
 end)
 
