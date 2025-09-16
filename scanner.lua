@@ -243,51 +243,59 @@ end
 local function hopToNewServer()
     if isTeleporting then return end
     isTeleporting = true
+
     local retryCount = 0
     local maxRetries = 20
     local baseDelay = 2
     local errorMessage = nil
+
     while retryCount < maxRetries do
         local servers, fetchError = getServers()
         errorMessage = fetchError
+
         if #servers == 0 then
             retryCount = retryCount + 1
             errorMessage = errorMessage or "No available servers found"
-            local delay = math.min(baseDelay * (2 ^ (retryCount - 1)), 15)
-            wait(delay)
-            continue
-        end
-        local targetServer = servers[math.random(1, #servers)]
-        local success, teleportError = pcall(function()
-            TeleportService:TeleportToPlaceInstance(PlaceID, targetServer.id, LocalPlayer)
-        end)
-        local elapsedTime = math.floor(tick() - startTime)
-        local embed = {
-            description = "**" .. LocalPlayer.Name .. "** hopped servers after ⏰ " .. elapsedTime .. "s.",
-            color = elapsedTime > 300 and 0xFF0000 or 0xFFFFFF,
-            timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z"),
-            author = { name = LocalPlayer.Name }
-        }
-        if errorMessage then
-            embed.fields = embed.fields or {}
-            table.insert(embed.fields, { name = "Error", value = errorMessage, inline = false })
-        end
-        if not success then
-            errorMessage = "Teleport failed: " .. tostring(teleportError)
-            embed.fields = embed.fields or {}
-            table.insert(embed.fields, { name = "Teleport Error", value = errorMessage, inline = false })
-        end
-        SendMessageEMBED(debugWebhookUrl, embed)
-        if success then
-            isTeleporting = false
-            return
+            local delayTime = math.min(baseDelay * (2 ^ (retryCount - 1)), 15)
+            wait(delayTime)
         else
-            retryCount = retryCount + 1
-            wait(baseDelay * (2 ^ (retryCount - 1)))
+            local targetServer = servers[math.random(1, #servers)]
+            local success, teleportError = pcall(function()
+                TeleportService:TeleportToPlaceInstance(PlaceID, targetServer.id, LocalPlayer)
+            end)
+
+            local elapsedTime = math.floor(tick() - startTime)
+            local embed = {
+                description = "**" .. LocalPlayer.Name .. "** hopped servers after ⏰ " .. elapsedTime .. "s.",
+                color = elapsedTime > 300 and 0xFF0000 or 0xFFFFFF,
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z"),
+                author = { name = LocalPlayer.Name }
+            }
+
+            if errorMessage then
+                embed.fields = embed.fields or {}
+                table.insert(embed.fields, { name = "Error", value = errorMessage, inline = false })
+            end
+
+            if not success then
+                errorMessage = "Teleport failed: " .. tostring(teleportError)
+                embed.fields = embed.fields or {}
+                table.insert(embed.fields, { name = "Teleport Error", value = errorMessage, inline = false })
+                retryCount = retryCount + 1
+                local delayTime = math.min(baseDelay * (2 ^ (retryCount - 1)), 15)
+                wait(delayTime)
+            else
+                SendMessageEMBED(debugWebhookUrl, embed)
+                isTeleporting = false
+                return
+            end
         end
     end
+
+    -- If all retries fail
     isTeleporting = false
 end
+
 
 TeleportService.TeleportInitFailed:Connect(function(player)
     if player == LocalPlayer then
