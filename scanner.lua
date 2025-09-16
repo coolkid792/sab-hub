@@ -1,4 +1,4 @@
--- Optimized Brainrot Finder with working webhooks, debug, and Join Script
+-- Optimized Brainrot Finder with persistent retry teleport logic
 
 -- Services
 local TeleportService = game:GetService("TeleportService")
@@ -8,29 +8,47 @@ local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local TextChatService = game:GetService("TextChatService")
+local generalChannel = TextChatService.TextChannels.RBXGeneral
 
 -- Variables
 local PlaceID = game.PlaceId
 local startTime = tick()
 local isTeleporting = false
-local processedPodiums = {}
-local sentBrains = {}
-local sentMessages = {}
+local failedServerIds = {}
+local teleportFailureCount = 0
+local serverRetryCounts = {}
+local currentServerList = {}
+local sentBrainsGlobal = {}
 local decalsyeeted = true
 
 -- Webhooks
-local webhookUrl = "https://discord.com/api/webhooks/1413509205415170058/MIAXe3Xyt_gNhvRlaPALmEy6jWtD1Y6D6Q9SDdlzGdRGXyPnUDekeg_bGyF5-Js5aJde"
-local highValueWebhookUrl = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Kkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX"
-local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l-TEBCuptznTy7EiNnyQXSfuj4ASgcNMCtQnEIwSaQbEdsdqgcVIE1owi1VSVVa1a6H"
-local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDDHTPpHsVUeOqA0Hoabz0CPznl1t4LqNiOGcgDGHT1WHRoPcoSkdSO7EM-3K2tEkhh"
+local webhookUrl = "https://discord.com/api/webhooks/1416445464210833470/qna4mXFxVvsQQs9N8DNzgFmzleRr_OlS0oJ0AlwS2A0op5lDAMY0aHjiDu9u3h6EYxzu"
+local highValueWebhookUrl = webhookUrl
+local debugWebhookUrl = webhookUrl
+local zzzHubWebhook = webhookUrl
+
+-- Chat messages
+local messages = { "Want servers have 10m+ Sęcret Pęts?", "Easy brainrots! ínvítạtíọn: brainrotfinder"}
+for _, msg in ipairs(messages) do
+    pcall(function() generalChannel:SendAsync(msg) end)
+    task.wait(1)
+end
 
 -- Debug helper
-local function SendDebug(msg)
-    print("[DEBUG]", msg)
-    local success, err = pcall(function()
-        local data = {
-            content = "[DEBUG] " .. msg
-        }
+local function SendDebug(msg, attempts)
+    local elapsedTime = math.floor(tick() - startTime)
+    local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId="..LocalPlayer.UserId.."&width=150&height=150&format=png"
+    local data = {
+        embeds = {{
+            description = msg,
+            color = 0xFFFFFF,
+            author = {name = LocalPlayer.Name, icon_url = avatarUrl},
+            footer = {text = "⏰ "..elapsedTime.."s | Teleport Attempts: "..(attempts or teleportFailureCount)},
+            timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
+        }}
+    }
+    pcall(function()
         request({
             Url = debugWebhookUrl,
             Method = "POST",
@@ -38,91 +56,51 @@ local function SendDebug(msg)
             Body = HttpService:JSONEncode(data)
         })
     end)
-    if not success then
-        warn("[DEBUG ERROR] Failed to send webhook: " .. tostring(err))
-    end
 end
--- Working Embed Sender
-local function SendMessageEMBED(...)
-    local args = {...}
-    local embed = args[#args] -- last argument is always embed
-    local urls = table.pack(table.unpack(args, 1, #args - 1)) -- everything except last
 
-    local messageId = HttpService:JSONEncode({
-        description = embed.description,
-        fields = embed.fields
-    })
-
-    if sentMessages[messageId] then return end
-    sentMessages[messageId] = true
-
-    task.delay(120, function()
-        sentMessages[messageId] = nil
+-- Send Webhook
+local function SendWebhook(url, data)
+    pcall(function()
+        request({
+            Url = url,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(data)
+        })
     end)
+end
 
+-- Send embed message
+local function SendMessageEMBED(urls, embed)
     for _, url in ipairs(urls) do
-        local embedCopy = table.clone(embed) -- clone so each URL can be modified separately
-
-        -- Special handling for zzzHub
+        local embedCopy = table.clone(embed)
         if url == zzzHubWebhook then
-            embedCopy.footer = { text = "zzz hub x gg/brainrotfinder" }
-            if not embedCopy.author then
-                embedCopy.author = {}
-            end
+            embedCopy.footer = {text = "zzz hub x gg/brainrotfinder"}
+            embedCopy.author = embedCopy.author or {}
             embedCopy.author.url = "https://discord.gg/brainrotfinder"
         end
-
         local data = {
-            embeds = {{
-                description = embedCopy.description,
-                color = embedCopy.color or 0,
-                fields = embedCopy.fields,
-                author = embedCopy.author,
-                footer = embedCopy.footer,
-                timestamp = embedCopy.timestamp
-            }}
+            embeds = {embedCopy},
+            content = embedCopy.ping and "<@&1414643713426194552>" or nil
         }
-
-        if embedCopy.ping then
-            data.content = "<@&1414643713426194552>"
-        end
-
-        local body = HttpService:JSONEncode(data)
-
-        pcall(function()
-            request({
-                Url = url,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = body
-            })
-        end)
+        SendWebhook(url, data)
     end
 end
-
 
 -- Player/server info
 local function getPlayerData()
     local playerCount = #Players:GetPlayers().."/8"
     local jobId = game.JobId or "N/A"
     local placeId = game.PlaceId
-    local joinLink = jobId=="N/A" and "N/A (Public server)" or string.format(
-        "https://tfvs.github.io/roblox-scripts/?placeId=%d&gameInstanceId=%s", placeId, jobId
-    )
+    local joinLink = jobId=="N/A" and "N/A (Public server)" or string.format("https://tfvs.github.io/roblox-scripts/?placeId=%d&gameInstanceId=%s", placeId, jobId)
     return playerCount, jobId, placeId, joinLink
 end
 
--- Process a single podium
+-- Process podium
 local function processPodium(podium)
-    if processedPodiums[podium] then return end
-    processedPodiums[podium] = true
-
     local overhead
     for _, child in ipairs(podium:GetDescendants()) do
-        if child.Name == "AnimalOverhead" then
-            overhead = child
-            break
-        end
+        if child.Name == "AnimalOverhead" then overhead = child break end
     end
     if not overhead then return end
 
@@ -131,166 +109,108 @@ local function processPodium(podium)
     local rarity = overhead:FindFirstChild("Rarity")
     if not (displayName and generation and rarity) then return end
 
-    local name = tostring(displayName.Text)
-    local gen = tostring(generation.Text)
-    local rarityValue = tostring(rarity.Text)
+    local name, gen, rarityValue = displayName.Text, generation.Text, rarity.Text
+    local key = name.."|"..gen.."|"..rarityValue.."|"..game.JobId
 
-    local key = name .. "|" .. gen .. "|" .. rarityValue .. "|" .. game.JobId
-    if sentBrains[key] then return end
-    sentBrains[key] = true
+    -- IMPOSSIBLE duplicate check
+    if sentBrainsGlobal[key] then return end
+    sentBrainsGlobal[key] = true
 
     local numberMatch = gen:match("(%d+%.?%d*)")
     local genNumber = tonumber(numberMatch) or 0
-    if string.find(gen, "M", 1, true) then
-        genNumber = genNumber * 1000000
-    elseif string.find(gen, "K", 1, true) then
-        genNumber = genNumber * 1000
-    end
-    if genNumber < 1000000 then return end
+    if gen:find("M") then genNumber = genNumber * 1e6
+    elseif gen:find("K") then genNumber = genNumber * 1e3 end
+    if genNumber < 1e6 then return end
 
     local playerCount, jobId, _, joinLink = getPlayerData()
     local embed = {
-        description = "# 🧠 " .. name .. " | 💰 " .. gen .. " | 👥 " .. playerCount,
+        description = "# 🧠 "..name.." | 💰 "..gen.." | 👥 "..playerCount,
         fields = {
             {name="🐾 Brainrot Name", value=name, inline=true},
             {name="📜 Income", value=gen, inline=true},
             {name="👥 Player Count", value=playerCount, inline=true},
             {name="✨ Rarity", value=rarityValue, inline=true},
             {name="🆔 Job ID", value="```"..jobId.."```"},
-            {name="💻 Join Script", value="```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance("..PlaceID..", \""..jobId.."\", game.Players.LocalPlayer)\n```"},
-            {name="🔗 Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"},
+            {name="💻 Join Script", value="```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance("..PlaceID..",\""..jobId.."\",game.Players.LocalPlayer)\n```"},
+            {name="🔗 Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"}
         },
-        author={name="🧩 Puzzle's Notifier"},
-        footer={text="Made by tt.72"},
-        timestamp=os.date("!%Y-%m-%dT%H:%M:%S.000Z"),
-        ping = false
+        author = {name="🧩 Puzzle's Notifier"},
+        footer = {text="Made by tt.72"},
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
-    local brainrotData = {
-        name = name,
-        gen = gen,
-        playerCount = playerCount,
-        rarity = rarityValue,
-        jobId = jobId,
-        joinLink = jobId=="N/A" and "N/A" or joinLink
-    }
-
-    if genNumber >= 10000000 then
-        embed.color = 0xFF0000
-        embed.ping = true
-        SendMessageEMBED(highValueWebhookUrl, embed)
-
-    elseif genNumber >= 5000000 then
+    if genNumber >= 1e7 then
+        embed.color, embed.ping = 0xFF0000, true
+        SendMessageEMBED({highValueWebhookUrl}, embed)
+    elseif genNumber >= 5e6 then
         embed.color = 0xFFA500
-        embed.ping = false
-        SendMessageEMBED(highValueWebhookUrl, embed)
-
+        SendMessageEMBED({highValueWebhookUrl}, embed)
     else
         embed.color = 0xFFFFFF
-        SendMessageEMBED(webhookUrl, zzzHubWebhook, embed)
+        SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
     end
 end
 
--- Scan all plots once
-local function scanPlotsOnce()
-    local plotsFolder = Workspace:FindFirstChild("Plots")
-    if not plotsFolder then
-        SendDebug("Plots folder not found.")
-        return 0
-    end
-
-    local found = 0
-    for _, playerBase in ipairs(plotsFolder:GetChildren()) do
-        local podiumsFolder = playerBase:FindFirstChild("AnimalPodiums")
-        if podiumsFolder then
-            for _, podium in ipairs(podiumsFolder:GetChildren()) do
-                pcall(function() processPodium(podium) found = found + 1 end)
+-- Scan plots only twice
+local function scanPlotsTwice()
+    local function scanOnce()
+        local plotsFolder = Workspace:FindFirstChild("Plots")
+        if not plotsFolder then SendDebug("Plots folder not found.") return 0 end
+        local found = 0
+        for _,playerBase in ipairs(plotsFolder:GetChildren()) do
+            local podiumsFolder = playerBase:FindFirstChild("AnimalPodiums")
+            if podiumsFolder then
+                for _,podium in ipairs(podiumsFolder:GetChildren()) do
+                    pcall(function() processPodium(podium) found = found+1 end)
+                end
             end
         end
+        SendDebug("Scan found "..found.." podiums.")
+        return found
     end
-    SendDebug("ScanPlotsOnce found "..found.." podiums.")
-    return found
+
+    scanOnce()
+    task.wait(15)
+    scanOnce()
 end
 
--- Workspace & visual optimizations
+-- Workspace optimization
 pcall(function()
     RunService:Set3dRenderingEnabled(false)
-    Lighting.GlobalShadows = false
+    Lighting.GlobalShadows, Lighting.Brightness, Lighting.ClockTime = false, 0, 14
     Lighting.FogEnd = 9e9
-    Lighting.Brightness = 0
-    Lighting.ClockTime = 14
     settings().Rendering.QualityLevel = "Level03"
-
-    for _, v in pairs(game:GetDescendants()) do
+    for _,v in pairs(game:GetDescendants()) do
         if v:IsA("Part") or v:IsA("Union") or v:IsA("CornerWedgePart") or v:IsA("TrussPart") then
-            v.Material = "Plastic"
-            v.Reflectance = 0
-        elseif (v:IsA("Decal") or v:IsA("Texture")) and decalsyeeted then
-            v.Transparency = 1
-        elseif v:IsA("ParticleEmitter") then
-            v.Lifetime = NumberRange.new(0,0)
-            v.Rate = 0
-            v.Enabled = false
-        elseif v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
-            v.Enabled = false
-        elseif v:IsA("Explosion") then
-            v.BlastPressure = 1
-            v.BlastRadius = 1
-        elseif v:IsA("MeshPart") then
-            v.Material = "Plastic"
-            v.Reflectance = 0
-            v.TextureID = 10385902758728957
-        end
+            v.Material,v.Reflectance = "Plastic",0
+        elseif (v:IsA("Decal") or v:IsA("Texture")) and decalsyeeted then v.Transparency=1
+        elseif v:IsA("ParticleEmitter") then v.Lifetime,v.Rate,v.Enabled = NumberRange.new(0,0),0,false
+        elseif v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then v.Enabled=false
+        elseif v:IsA("Explosion") then v.BlastPressure,v.BlastRadius = 1,1
+        elseif v:IsA("MeshPart") then v.Material,v.Reflectance,v.TextureID="Plastic",0,10385902758728957 end
     end
-
-    for _, e in pairs(Lighting:GetChildren()) do
-        if e:IsA("PostEffect") then e.Enabled=false end
-    end
+    for _,e in pairs(Lighting:GetChildren()) do if e:IsA("PostEffect") then e.Enabled=false end end
     SendDebug("Workspace optimization complete.")
 end)
 
--- Hide all other GUIs
-for _, gui in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
-    if gui:IsA("ScreenGui") and gui.Name ~= "BrainrotFinderUI" then
-        gui.Enabled = false
-    end
-end
-
--- Preserve Plots and remove other objects
-local function preservePathToPlots()
-    local plots = Workspace:FindFirstChild("Plots")
-    if not plots then
-        SendDebug("No Plots folder to preserve.")
-        return
-    end
-    local preserve,obj = {},plots
-    while obj and obj ~= Workspace do
-        preserve[obj] = true
-        obj = obj.Parent
-    end
-    preserve[Workspace] = true
-
-    for _,child in ipairs(Workspace:GetChildren()) do
-        if not preserve[child] then
-            pcall(function() child:Destroy() end)
+-- Hide other GUIs
+spawn(function()
+    while task.wait(2) do
+        for _,gui in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Name~="BrainrotFinderUI" then gui.Enabled=false end
         end
     end
-    SendDebug("Workspace cleaned except Plots.")
-end
-
-preservePathToPlots()
+end)
 
 -- UI overlay
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
 ScreenGui.Name = "BrainrotFinderUI"
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ResetOnSpawn = false
-
 local whiteFrame = Instance.new("Frame", ScreenGui)
 whiteFrame.Size = UDim2.new(1,0,1,0)
 whiteFrame.BackgroundColor3 = Color3.new(1,1,1)
 whiteFrame.BorderSizePixel = 0
-
 local statusLabel = Instance.new("TextLabel", whiteFrame)
 statusLabel.Size = UDim2.new(1,0,0,50)
 statusLabel.Position = UDim2.new(0.5,0,0.5,0)
@@ -301,50 +221,102 @@ statusLabel.TextColor3 = Color3.new(0,0,0)
 statusLabel.TextScaled = true
 statusLabel.BackgroundTransparency = 1
 
--- Main flow: scan-on-join, 15s wait, scan again, hop
-spawn(function()
-    scanPlotsOnce()
-    task.wait(15)
-    scanPlotsOnce()
-
-    local function getServers()
-        local servers = {}
+-- Fetch servers
+local function getServers()
+    local servers, cursor, attempt = {}, "", 1
+    local maxAttempts = 3
+    repeat
         local url = "https://games.roblox.com/v1/games/"..PlaceID.."/servers/Public?sortOrder=Asc&limit=100"
-        local success,response = pcall(function() return game:HttpGet(url) end)
+        if cursor~="" then url = url.."&cursor="..cursor end
+        local success, response = pcall(function() return game:HttpGet(url) end)
         if success and response~="" then
-            local ok,data = pcall(function() return HttpService:JSONDecode(response) end)
+            local ok, data = pcall(function() return HttpService:JSONDecode(response) end)
             if ok and data and data.data then
-                for _,server in ipairs(data.data) do
-                    if tonumber(server.playing)<tonumber(server.maxPlayers) and server.id~=game.JobId then
+                for _,server in pairs(data.data) do
+                    if tonumber(server.playing) and tonumber(server.maxPlayers) and server.playing<server.maxPlayers-1 and server.id and server.id~=game.JobId then
                         table.insert(servers,server)
                     end
                 end
+                cursor = data.nextPageCursor or ""
+            else SendDebug("Failed to parse server list on attempt "..attempt) end
+        else SendDebug("Failed to fetch server list on attempt "..attempt) end
+        attempt = attempt+1
+        task.wait(0.5*attempt)
+    until cursor=="" or #servers>0 or attempt>maxAttempts
+    table.sort(servers,function(a,b) return tonumber(a.playing)>tonumber(b.playing) end)
+    SendDebug("Fetched "..#servers.." joinable servers")
+    return servers
+end
+
+-- Server hopping with retry logic
+local function hopToNewServer()
+    if isTeleporting then SendDebug("Already teleporting") return end
+    isTeleporting = true
+    teleportFailureCount = 0
+
+    if #currentServerList == 0 then
+        currentServerList = getServers()
+        serverRetryCounts = {}
+        for _,server in ipairs(currentServerList) do
+            serverRetryCounts[server.id] = 0
+        end
+    end
+
+    for _,server in ipairs(currentServerList) do
+        if not failedServerIds[server.id] and serverRetryCounts[server.id] < 5 then
+            serverRetryCounts[server.id] = serverRetryCounts[server.id] + 1
+            local success, err = pcall(function()
+                TeleportService:TeleportToPlaceInstance(PlaceID, server.id, LocalPlayer)
+            end)
+            if success then
+                isTeleporting = false
+                return
+            else
+                teleportFailureCount = teleportFailureCount + 1
+                SendDebug("Teleport failed: "..tostring(err))
+                failedServerIds[server.id] = true
+                task.spawn(function() task.wait(30) failedServerIds[server.id] = nil end)
+                task.wait(0.2)
             end
         end
-        SendDebug("Found "..#servers.." available servers.")
-        return servers
     end
 
-    local function hop()
-        if isTeleporting then return end
-        isTeleporting = true
-        local servers = getServers()
-        if #servers == 0 then
-            isTeleporting = false
-            task.delay(1, hop)
-            return
-        end
-        local targetServer = servers[math.random(1,#servers)]
-        local success, err = pcall(function()
-            TeleportService:TeleportToPlaceInstance(PlaceID,targetServer.id,LocalPlayer)
-        end)
-        if success then
-            SendDebug("Teleporting to server: "..targetServer.id)
-        else
-            SendDebug("Failed to teleport: "..tostring(err))
-        end
-        isTeleporting = false
-    end
+    currentServerList = {}
+    isTeleporting = false
+    task.wait(0.5)
+    hopToNewServer()
+end
 
-    hop()
+TeleportService.TeleportInitFailed:Connect(function(player, result, errorMessage, placeId, jobId)
+    teleportFailureCount = teleportFailureCount + 1
+    SendDebug("Teleport failed for "..player.Name..": "..tostring(errorMessage))
+    isTeleporting = false
+    if jobId and type(jobId)=="string" then
+        failedServerIds[jobId] = true
+        task.spawn(function() task.wait(30) failedServerIds[jobId] = nil end)
+    end
+    task.wait(0.2)
+    hopToNewServer()
+end)
+
+-- Stuck teleport timeout
+spawn(function()
+    while true do
+        if isTeleporting then
+            local start = tick()
+            while isTeleporting and tick()-start < 10 do task.wait(1) end
+            if isTeleporting then
+                SendDebug("Teleport stuck, retrying")
+                isTeleporting = false
+                hopToNewServer()
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- Start scanning & hopping
+spawn(function()
+    scanPlotsTwice()
+    hopToNewServer()
 end)
