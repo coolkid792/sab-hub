@@ -24,18 +24,17 @@ local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDD
 -- Prevent duplicate messages
 local function SendMessageEMBED(...)
     local args = {...}
-    local embed = args[#args]
-    local urls = table.pack(table.unpack(args, 1, #args - 1))
+    local embed = args[#args] -- last argument is always embed
+    local urls = table.pack(table.unpack(args, 1, #args - 1)) -- everything except last
 
     local messageId = HttpService:JSONEncode({
         description = embed.description,
         fields = embed.fields
     })
-
     if sentMessages[messageId] then return end
     sentMessages[messageId] = true
 
-    task.delay(10, function()
+    task.delay(120, function()
         sentMessages[messageId] = nil
     end)
 
@@ -63,8 +62,10 @@ local function SendMessageEMBED(...)
         end
 
         local body = HttpService:JSONEncode(data)
+
+        -- OLD HTTP WAY
         pcall(function()
-            HttpService:RequestAsync({
+            request({
                 Url = url,
                 Method = "POST",
                 Headers = { ["Content-Type"] = "application/json" },
@@ -73,6 +74,7 @@ local function SendMessageEMBED(...)
         end)
     end
 end
+
 
 -- Player data
 local function getPlayerData()
