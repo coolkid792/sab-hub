@@ -151,6 +151,7 @@ local function processPodium(podium)
         SendMessageEMBED(highValueWebhookUrl, embed)
     else
         embed.color = 0xFFFFFF
+        -- FIX: Send to zzzHubWebhook properly
         SendMessageEMBED(webhookUrl, zzzHubWebhook, embed)
     end
 end
@@ -165,6 +166,7 @@ local function scanPlots()
             for _, podium in ipairs(podiumsFolder:GetChildren()) do
                 processPodium(podium)
             end
+            -- ChildAdded connection once
             if not podiumsFolder:FindFirstChild("ChildAddedConnection") then
                 local connection = podiumsFolder.ChildAdded:Connect(processPodium)
                 local marker = Instance.new("BoolValue", podiumsFolder)
@@ -197,122 +199,64 @@ Players.PlayerAdded:Connect(scanPlots)
 
 -- Server hopping
 local function getServers()
-    local servers = {}
-    local cursor = ""
-    local maxPages = 4  -- Fetch up to 200 servers
-    local errorMessage = nil
-    for i = 1, maxPages do
-        local url = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=50"
-        if cursor ~= "" then
-            url = url .. "&cursor=" .. cursor
-        end
-        local success, response = pcall(function()
-            local res = HttpService:RequestAsync({Url = url, Method = "GET"})
-            if res.StatusCode == 429 then
-                errorMessage = "Rate limit hit (429)"
-                error(errorMessage)
-            elseif res.StatusCode >= 400 then
-                errorMessage = "HTTP error: " .. res.StatusCode
-                error(errorMessage)
-            end
-            return res.Body
-        end)
-        if not success then
-            errorMessage = errorMessage or "API fetch failed: " .. tostring(response)
-            break
-        end
+    local servers, cursor = {}, ""
+    local url = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=50"
+    local success, response = pcall(function() return game:HttpGet(url) end)
+    if success and response and response ~= "" then
         local decodeSuccess, data = pcall(function() return HttpService:JSONDecode(response) end)
-        if not decodeSuccess or not data or not data.data then
-            errorMessage = errorMessage or "JSON decode failed or no data"
-            break
-        end
-        for _, server in pairs(data.data) do
-            if server.playing and server.maxPlayers and server.playing < server.maxPlayers and server.id ~= game.JobId then
-                table.insert(servers, server)
+        if decodeSuccess and data and data.data then
+            for _, server in pairs(data.data) do
+                if tonumber(server.playing)
+                    and tonumber(server.maxPlayers)
+                    and tonumber(server.playing) < tonumber(server.maxPlayers)
+                    and server.id ~= game.JobId then
+                    table.insert(servers, server)
+                end
             end
         end
-        cursor = data.nextPageCursor
-        if not cursor then
-            break
-        end
-        wait(0.5)
     end
-    return servers, errorMessage
+    return servers
 end
 
 local function hopToNewServer()
     if isTeleporting then return end
     isTeleporting = true
-
-    local retryCount = 0
-    local maxRetries = 20
-    local baseDelay = 2
-    local errorMessage = nil
-
-    while retryCount < maxRetries do
-        local servers, fetchError = getServers()
-        errorMessage = fetchError
-
-        if #servers == 0 then
-            retryCount = retryCount + 1
-            errorMessage = errorMessage or "No available servers found"
-            local delayTime = math.min(baseDelay * (2 ^ (retryCount - 1)), 15)
-            wait(delayTime)
-        else
-            local targetServer = servers[math.random(1, #servers)]
-            local success, teleportError = pcall(function()
-                TeleportService:TeleportToPlaceInstance(PlaceID, targetServer.id, LocalPlayer)
-            end)
-
-            local elapsedTime = math.floor(tick() - startTime)
-            local embed = {
-                description = "**" .. LocalPlayer.Name .. "** hopped servers after ⏰ " .. elapsedTime .. "s.",
-                color = elapsedTime > 300 and 0xFF0000 or 0xFFFFFF,
-                timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z"),
-                author = { name = LocalPlayer.Name }
-            }
-
-            if errorMessage then
-                embed.fields = embed.fields or {}
-                table.insert(embed.fields, { name = "Error", value = errorMessage, inline = false })
-            end
-
-            if not success then
-                errorMessage = "Teleport failed: " .. tostring(teleportError)
-                embed.fields = embed.fields or {}
-                table.insert(embed.fields, { name = "Teleport Error", value = errorMessage, inline = false })
-                retryCount = retryCount + 1
-                local delayTime = math.min(baseDelay * (2 ^ (retryCount - 1)), 15)
-                wait(delayTime)
-            else
-                SendMessageEMBED(debugWebhookUrl, embed)
-                isTeleporting = false
-                return
-            end
-        end
+    local servers = getServers()
+    if #servers == 0 then
+        isTeleporting = false
+        task.delay(1, hopToNewServer)
+        return
     end
 
-    -- If all retries fail
-    isTeleporting = false
-end
+    local targetServer = servers[math.random(1, #servers)]
+    local success = pcall(function()
+        TeleportService:TeleportToPlaceInstance(PlaceID, targetServer.id, LocalPlayer)
+    end)
 
+    local elapsedTime = math.floor(tick() - startTime)
+    if success then
+        SendMessageEMBED(debugWebhookUrl, {
+            description = "**" .. LocalPlayer.Name .. "** hopped servers after ⏰ " .. elapsedTime .. "s.",
+            color = elapsedTime > 300 and 0xFF0000 or 0xFFFFFF,
+            timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z"),
+            author = { name = LocalPlayer.Name }
+        })
+        isTeleporting = false
+    else
+        isTeleporting = false
+        task.delay(1, hopToNewServer)
+    end
+end
 
 TeleportService.TeleportInitFailed:Connect(function(player)
     if player == LocalPlayer then
         isTeleporting = false
-        local elapsedTime = math.floor(tick() - startTime)
-        SendMessageEMBED(debugWebhookUrl, {
-            description = "**" .. LocalPlayer.Name .. "** failed to hop after ⏰ " .. elapsedTime .. "s.",
-            color = 0xFF0000,
-            timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z"),
-            author = { name = LocalPlayer.Name },
-            fields = { { name = "Error", value = "TeleportInitFailed", inline = false } }
-        })
-        task.delay(2, hopToNewServer)
+        task.delay(1, hopToNewServer)
     end
 end)
 
-task.delay(15 + math.random(0, 10), hopToNewServer)
+-- Hop after 15 seconds
+task.delay(15, hopToNewServer)
 
 -- White overlay screen
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
