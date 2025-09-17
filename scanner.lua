@@ -184,7 +184,7 @@ local function processPodium(podium, plotOwner, floorNum)
             {name="🔗 Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"}
         },
         author = {name="🧩 Puzzle's Notifier"},
-        footer = {text = "Puzzle Brainrot Finder (ping: "..getPing().."ms)"},
+        footer = {text = "Puzzle Brainrot Finder"},
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
