@@ -1,3 +1,4 @@
+
 -- Services
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
@@ -20,15 +21,9 @@ local currentServerList = {}
 local sentBrainsGlobal = {}
 local decalsyeeted = true
 
--- Debug webhook variables
-local debugMessageId = nil
-local debugMessages = {}
-local lastDebugUpdate = 0
-local debugUpdateInterval = 2 -- Update every 2 seconds
-
 -- Webhooks
 local webhookUrl = "https://discord.com/api/webhooks/1413509205415170058/MIAXe3Xyt_gNhvRlaPALmEy6jWtD1Y6D6Q9SDdlzGdRGXyPnUDekeg_bGyF5-Js5aJde"
-local highValueWebhookUrl = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Xkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX"
+local highValueWebhookUrl = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Kkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX"
 local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l-TEBCuptznTy7EiNnyQXSfuj4ASgcNMCtQnEIwSaQbEdsdqgcVIE1owi1VSVVa1a6H"
 local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDDHTPpHsVUeOqA0Hoabz0CPznl1t4LqNiOGcgDGHT1WHRoPcoSkdSO7EM-3K2tEkhh"
 
@@ -39,81 +34,39 @@ for _, msg in ipairs(messages) do
     task.wait(1)
 end
 
--- Send Webhook
--- Send Webhook
-local function SendWebhook(url, data)
-    request({
-        Url = url,
-        Method = "POST",
-        Headers = {["Content-Type"] = "application/json"},
-        Body = HttpService:JSONEncode(data)
-    })
-end
-
--- Send webhook edit
-local function SendWebhookEdit(url, messageId, data)
-    request({
-        Url = url .. "/messages/" .. messageId,
-        Method = "PATCH",
-        Headers = {["Content-Type"] = "application/json"},
-        Body = HttpService:JSONEncode(data)
-    })
-end
-
-
--- Update debug message
-local function UpdateDebugMessage()
-    if #debugMessages == 0 then return end
-
+-- Debug helper
+local function SendDebug(msg, attempts)
     local elapsedTime = math.floor(tick() - startTime)
     local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId="..LocalPlayer.UserId.."&width=150&height=150&format=png"
-
-    local description = table.concat(debugMessages, "\n")
     local data = {
         embeds = {{
-            description = description,
+            description = msg,
             color = 0xFFFFFF,
             author = {name = LocalPlayer.Name, icon_url = avatarUrl},
-            footer = {text = "⏰ "..elapsedTime.."s | Teleport Attempts: "..teleportFailureCount},
+            footer = {text = "⏰ "..elapsedTime.."s | Teleport Attempts: "..(attempts or teleportFailureCount)},
             timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
         }}
     }
-
-    if debugMessageId then
-        SendWebhookEdit(debugWebhookUrl, debugMessageId, data)
-    else
-        local success, response = pcall(function()
-            return request({
-                Url = debugWebhookUrl,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = HttpService:JSONEncode(data)
-            })
-        end)
-
-        if success and response and response.StatusCode == 200 then
-            local responseData = HttpService:JSONDecode(response.Body)
-            debugMessageId = responseData.id
-        end
-    end
+    pcall(function()
+        request({
+            Url = debugWebhookUrl,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(data)
+        })
+    end)
 end
 
--- Debug helper with accumulation
-local function SendDebug(msg, attempts)
-    local timestamp = os.date("!%H:%M:%S")
-    local debugEntry = "`[" .. timestamp .. "]` " .. msg
-    table.insert(debugMessages, debugEntry)
-
-    -- Keep only last 20 messages to prevent embed from being too long
-    if #debugMessages > 20 then
-        table.remove(debugMessages, 1)
-    end
-
-    local currentTime = tick()
-    if currentTime - lastDebugUpdate >= debugUpdateInterval then
-        UpdateDebugMessage()
-        lastDebugUpdate = currentTime
-    end
+-- Send Webhook
+local function SendWebhook(url, data)
+    pcall(function()
+        request({
+            Url = url,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(data)
+        })
+    end)
 end
 
 -- Send embed message
@@ -173,6 +126,7 @@ local function getPing()
     return 0
 end
 
+
 -- Helper: determine floor number
 local function getFloorNumber(podium)
     local parentName = podium.Name
@@ -226,7 +180,7 @@ local function processPodium(podium, plotOwner, floorNum)
             {name="☀️ Owner", value=plotOwner.." (Floor "..floorNum..")", inline=true},
             {name="🆔 Job ID", value="```"..jobId.."```"},
             {name="💻 Join Script", value="```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance("..PlaceID..",\""..jobId.."\",game.Players.LocalPlayer)\n```"},
-            {name="�� Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"}
+            {name="🔗 Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"}
         },
         author = {name="🧩 Puzzle's Notifier"},
         footer = {text = "Puzzle Brainrot Finder"},
@@ -266,7 +220,7 @@ local function scanPlotsTwice()
     end
 
     scanOnce()
-    task.wait(10)
+    task.wait(15)
     scanOnce()
 end
 
@@ -343,15 +297,13 @@ local function getServers()
     return servers
 end
 
--- Server hopping with random selection & proper retry logic
+-- Server hopping with random selection & fast retry
 local function hopToNewServer()
     if isTeleporting then SendDebug("Already teleporting") return end
     isTeleporting = true
     teleportFailureCount = 0
 
-    -- Only fetch new servers if we don't have any
     if #currentServerList == 0 then
-        SendDebug("Fetching new server list...")
         currentServerList = getServers()
         serverRetryCounts = {}
         for _,server in ipairs(currentServerList) do
@@ -359,45 +311,31 @@ local function hopToNewServer()
         end
     end
 
-    local attempts = 0
-    local maxAttempts = math.min(20, #currentServerList) -- Try up to 20 servers from current batch
-
-    while #currentServerList > 0 and attempts < maxAttempts do
+    while #currentServerList > 0 do
         local idx = math.random(1, #currentServerList)
         local server = currentServerList[idx]
-
-        if not failedServerIds[server.id] and serverRetryCounts[server.id] < 3 then
+        if not failedServerIds[server.id] and serverRetryCounts[server.id] < 5 then
             serverRetryCounts[server.id] = serverRetryCounts[server.id] + 1
-            attempts = attempts + 1
-
-            SendDebug("Attempting to join server " .. server.id .. " (attempt " .. attempts .. "/" .. maxAttempts .. ")")
-
             local success, err = pcall(function()
                 TeleportService:TeleportToPlaceInstance(PlaceID, server.id, LocalPlayer)
             end)
-
             if success then
-                SendDebug("Successfully teleporting to server " .. server.id)
                 isTeleporting = false
                 return
             else
                 teleportFailureCount = teleportFailureCount + 1
-                SendDebug("Teleport failed: " .. tostring(err))
+                SendDebug("Teleport failed: "..tostring(err))
                 failedServerIds[server.id] = true
-                task.spawn(function() task.wait(5) failedServerIds[server.id] = nil end)
-                task.wait(1) -- Wait 1 second before trying next server
+                task.spawn(function() task.wait(1) failedServerIds[server.id] = nil end)
+                task.wait(1) -- retry quickly
             end
-        else
-            -- Remove server if it's failed too many times or is blacklisted
-            table.remove(currentServerList, idx)
         end
+        table.remove(currentServerList, idx)
     end
 
-    -- If we've tried all servers in current batch, clear the list to fetch new ones
-    SendDebug("Exhausted current server batch, will fetch new servers next time")
     currentServerList = {}
     isTeleporting = false
-    task.wait(2) -- Wait 2 seconds before trying again
+    task.wait(0.5)
     hopToNewServer()
 end
 
@@ -426,16 +364,6 @@ spawn(function()
             end
         end
         task.wait(1)
-    end
-end)
-
--- Periodic debug update
-spawn(function()
-    while true do
-        task.wait(debugUpdateInterval)
-        if #debugMessages > 0 then
-            UpdateDebugMessage()
-        end
     end
 end)
 
