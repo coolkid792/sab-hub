@@ -96,8 +96,57 @@ local function getPlayerData()
     return playerCount, jobId, placeId, joinLink
 end
 
+-- Helper: get plot owner name
+local function getPlotOwner(plot)
+    local plotSign = plot:FindFirstChild("PlotSign")
+    if not plotSign then return "Unknown" end
+
+    local surfaceGui = plotSign:FindFirstChild("SurfaceGui")
+    if not surfaceGui then return "Unknown" end
+
+    local frame = surfaceGui:FindFirstChild("Frame")
+    if not frame then return "Unknown" end
+
+    local textLabel = frame:FindFirstChild("TextLabel")
+    if not textLabel or not textLabel.Text then return "Unknown" end
+
+    local raw = textLabel.Text  -- e.g. "Puzzle's Base"
+    -- remove " Base" at the end
+    local cleaned = raw:gsub(" Base$", "")
+    -- remove trailing "'s"
+    cleaned = cleaned:gsub("'s$", "")
+    return cleaned
+end
+
+local function getPing()
+    local stats = game:GetService("Stats")
+    local pingStat = stats.Network.ServerStatsItem["Data Ping"]
+    if pingStat and pingStat:GetValue() then
+        return math.floor(pingStat:GetValue())
+    end
+    return 0
+end
+
+
+-- Helper: determine floor number
+local function getFloorNumber(podium)
+    local parentName = podium.Name
+    local floorNum = 1
+    local num = tonumber(parentName)
+    if num then
+        if num >= 1 and num <= 10 then
+            floorNum = 1
+        elseif num >= 11 and num <= 18 then
+            floorNum = 2
+        else
+            floorNum = 3
+        end
+    end
+    return floorNum
+end
+
 -- Process podium
-local function processPodium(podium)
+local function processPodium(podium, plotOwner, floorNum)
     local overhead
     for _, child in ipairs(podium:GetDescendants()) do
         if child.Name == "AnimalOverhead" then overhead = child break end
@@ -129,12 +178,13 @@ local function processPodium(podium)
             {name="📜 Income", value=gen, inline=true},
             {name="👥 Player Count", value=playerCount, inline=true},
             {name="✨ Rarity", value=rarityValue, inline=true},
+            {name="☀️ Owner", value=plotOwner.." (Floor "..floorNum..")", inline=true},
             {name="🆔 Job ID", value="```"..jobId.."```"},
             {name="💻 Join Script", value="```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance("..PlaceID..",\""..jobId.."\",game.Players.LocalPlayer)\n```"},
             {name="🔗 Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"}
         },
         author = {name="🧩 Puzzle's Notifier"},
-        footer = {text="Made by tt.72"},
+        footer = {text = "Puzzle Brainrot Finder (ping: "..getPing().."ms)"},
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
@@ -157,10 +207,12 @@ local function scanPlotsTwice()
         if not plotsFolder then SendDebug("Plots folder not found.") return 0 end
         local found = 0
         for _,playerBase in ipairs(plotsFolder:GetChildren()) do
+            local plotOwner = getPlotOwner(playerBase)
             local podiumsFolder = playerBase:FindFirstChild("AnimalPodiums")
             if podiumsFolder then
                 for _,podium in ipairs(podiumsFolder:GetChildren()) do
-                    pcall(function() processPodium(podium) found = found+1 end)
+                    local floorNum = getFloorNumber(podium)
+                    pcall(function() processPodium(podium, plotOwner, floorNum) found = found+1 end)
                 end
             end
         end
