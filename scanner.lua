@@ -1,4 +1,3 @@
-
 -- Services
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
@@ -21,9 +20,15 @@ local currentServerList = {}
 local sentBrainsGlobal = {}
 local decalsyeeted = true
 
+-- Debug webhook variables
+local debugMessageId = nil
+local debugMessages = {}
+local lastDebugUpdate = 0
+local debugUpdateInterval = 2 -- Update every 2 seconds
+
 -- Webhooks
 local webhookUrl = "https://discord.com/api/webhooks/1413509205415170058/MIAXe3Xyt_gNhvRlaPALmEy6jWtD1Y6D6Q9SDdlzGdRGXyPnUDekeg_bGyF5-Js5aJde"
-local highValueWebhookUrl = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Kkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX"
+local highValueWebhookUrl = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Xkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX"
 local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l-TEBCuptznTy7EiNnyQXSfuj4ASgcNMCtQnEIwSaQbEdsdqgcVIE1owi1VSVVa1a6H"
 local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDDHTPpHsVUeOqA0Hoabz0CPznl1t4LqNiOGcgDGHT1WHRoPcoSkdSO7EM-3K2tEkhh"
 
@@ -32,29 +37,6 @@ local messages = { "Want servers have 10m+ Sęcret Pęts?", "Easy brainrots! ín
 for _, msg in ipairs(messages) do
     pcall(function() generalChannel:SendAsync(msg) end)
     task.wait(1)
-end
-
--- Debug helper
-local function SendDebug(msg, attempts)
-    local elapsedTime = math.floor(tick() - startTime)
-    local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId="..LocalPlayer.UserId.."&width=150&height=150&format=png"
-    local data = {
-        embeds = {{
-            description = msg,
-            color = 0xFFFFFF,
-            author = {name = LocalPlayer.Name, icon_url = avatarUrl},
-            footer = {text = "⏰ "..elapsedTime.."s | Teleport Attempts: "..(attempts or teleportFailureCount)},
-            timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
-        }}
-    }
-    pcall(function()
-        request({
-            Url = debugWebhookUrl,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = HttpService:JSONEncode(data)
-        })
-    end)
 end
 
 -- Send Webhook
@@ -67,6 +49,73 @@ local function SendWebhook(url, data)
             Body = HttpService:JSONEncode(data)
         })
     end)
+end
+
+-- Send webhook edit
+local function SendWebhookEdit(url, messageId, data)
+    pcall(function()
+        request({
+            Url = url .. "/messages/" .. messageId,
+            Method = "PATCH",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(data)
+        })
+    end)
+end
+
+-- Update debug message
+local function UpdateDebugMessage()
+    if #debugMessages == 0 then return end
+    
+    local elapsedTime = math.floor(tick() - startTime)
+    local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId="..LocalPlayer.UserId.."&width=150&height=150&format=png"
+    
+    local description = table.concat(debugMessages, "\n")
+    local data = {
+        embeds = {{
+            description = description,
+            color = 0xFFFFFF,
+            author = {name = LocalPlayer.Name, icon_url = avatarUrl},
+            footer = {text = "⏰ "..elapsedTime.."s | Teleport Attempts: "..teleportFailureCount},
+            timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
+        }}
+    }
+    
+    if debugMessageId then
+        SendWebhookEdit(debugWebhookUrl, debugMessageId, data)
+    else
+        local success, response = pcall(function()
+            return request({
+                Url = debugWebhookUrl,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(data)
+            })
+        end)
+        
+        if success and response and response.StatusCode == 200 then
+            local responseData = HttpService:JSONDecode(response.Body)
+            debugMessageId = responseData.id
+        end
+    end
+end
+
+-- Debug helper with accumulation
+local function SendDebug(msg, attempts)
+    local timestamp = os.date("!%H:%M:%S")
+    local debugEntry = "`[" .. timestamp .. "]` " .. msg
+    table.insert(debugMessages, debugEntry)
+    
+    -- Keep only last 20 messages to prevent embed from being too long
+    if #debugMessages > 20 then
+        table.remove(debugMessages, 1)
+    end
+    
+    local currentTime = tick()
+    if currentTime - lastDebugUpdate >= debugUpdateInterval then
+        UpdateDebugMessage()
+        lastDebugUpdate = currentTime
+    end
 end
 
 -- Send embed message
@@ -126,7 +175,6 @@ local function getPing()
     return 0
 end
 
-
 -- Helper: determine floor number
 local function getFloorNumber(podium)
     local parentName = podium.Name
@@ -180,7 +228,7 @@ local function processPodium(podium, plotOwner, floorNum)
             {name="☀️ Owner", value=plotOwner.." (Floor "..floorNum..")", inline=true},
             {name="🆔 Job ID", value="```"..jobId.."```"},
             {name="💻 Join Script", value="```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance("..PlaceID..",\""..jobId.."\",game.Players.LocalPlayer)\n```"},
-            {name="🔗 Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"}
+            {name="�� Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"}
         },
         author = {name="🧩 Puzzle's Notifier"},
         footer = {text = "Puzzle Brainrot Finder"},
@@ -220,7 +268,7 @@ local function scanPlotsTwice()
     end
 
     scanOnce()
-    task.wait(15)
+    task.wait(10)
     scanOnce()
 end
 
@@ -364,6 +412,16 @@ spawn(function()
             end
         end
         task.wait(1)
+    end
+end)
+
+-- Periodic debug update
+spawn(function()
+    while true do
+        task.wait(debugUpdateInterval)
+        if #debugMessages > 0 then
+            UpdateDebugMessage()
+        end
     end
 end)
 
