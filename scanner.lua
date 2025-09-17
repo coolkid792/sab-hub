@@ -1,4 +1,4 @@
--- Optimized Brainrot Finder with randomized server hopping and fast retry
+- Optimized Brainrot Finder with randomized server hopping and fast retry
 
 -- Services
 local TeleportService = game:GetService("TeleportService")
@@ -17,6 +17,7 @@ local startTime = tick()
 local isTeleporting = false
 local failedServerIds = {}
 local teleportFailureCount = 0
+local serverRetryCounts = {}
 local currentServerList = {}
 local sentBrainsGlobal = {}
 local decalsyeeted = true
@@ -110,7 +111,9 @@ local function getPlotOwner(plot)
     if not textLabel or not textLabel.Text then return "Unknown" end
 
     local raw = textLabel.Text  -- e.g. "Puzzle's Base"
+    -- remove " Base" at the end
     local cleaned = raw:gsub(" Base$", "")
+    -- remove trailing "'s"
     cleaned = cleaned:gsub("'s$", "")
     return cleaned
 end
@@ -123,6 +126,7 @@ local function getPing()
     end
     return 0
 end
+
 
 -- Helper: determine floor number
 local function getFloorNumber(podium)
@@ -268,72 +272,72 @@ statusLabel.TextColor3 = Color3.new(0,0,0)
 statusLabel.TextScaled = true
 statusLabel.BackgroundTransparency = 1
 
--- 🆕 New Hopper System --
-
--- Fetch servers (new)
+-- Fetch servers
 local function getServers()
-    local servers, cursor, attempt = {}, '', 1
-    local maxAttempts = 5
+    local servers, cursor, attempt = {}, "", 1
+    local maxAttempts = 3
     repeat
-        local url = 'https://games.roblox.com/v1/games/'..PlaceID..'/servers/Public?sortOrder=Asc&limit=100'
-        if cursor ~= '' then
-            url = url .. "&cursor=" .. cursor
-        end
-
-        local success, response = pcall(function()
-            return game:HttpGet(url, true)
-        end)
-
-        if success and response and response ~= '' then
-            local ok, data = pcall(function()
-                return HttpService:JSONDecode(response)
-            end)
+        local url = "https://games.roblox.com/v1/games/"..PlaceID.."/servers/Public?sortOrder=Asc&limit=100"
+        if cursor~="" then url = url.."&cursor="..cursor end
+        local success, response = pcall(function() return game:HttpGet(url) end)
+        if success and response~="" then
+            local ok, data = pcall(function() return HttpService:JSONDecode(response) end)
             if ok and data and data.data then
-                for _, server in ipairs(data.data) do
-                    if tonumber(server.playing) and tonumber(server.maxPlayers) and server.playing < server.maxPlayers and server.id ~= game.JobId then
-                        table.insert(servers, server)
+                for _,server in pairs(data.data) do
+                    if tonumber(server.playing) and tonumber(server.maxPlayers) and server.playing<server.maxPlayers-1 and server.id and server.id~=game.JobId then
+                        table.insert(servers,server)
                     end
                 end
-                cursor = data.nextPageCursor or ''
-            else
-                cursor = '' -- stop on JSON fail
-            end
-        else
-            attempt = attempt + 1
-            task.wait(0.5)
-        end
-    until cursor == '' or attempt > maxAttempts
-
-    for i = #servers, 2, -1 do
-        local j = math.random(i)
-        servers[i], servers[j] = servers[j], servers[i]
-    end
-
-    SendDebug('Fetched ' .. #servers .. ' joinable servers')
+                cursor = data.nextPageCursor or ""
+            else SendDebug("Failed to parse server list on attempt "..attempt) end
+        else SendDebug("Failed to fetch server list on attempt "..attempt) end
+        attempt = attempt+1
+        task.wait(0.5*attempt)
+    until cursor=="" or #servers>0 or attempt>maxAttempts
+    SendDebug("Fetched "..#servers.." joinable servers")
     return servers
 end
 
--- Hop to server (new)
-local function hopToNewServer(maxTime)
-    local deadline = tick() + (maxTime or 30)
-    while tick() < deadline do
-        if #currentServerList == 0 then
-            currentServerList = getServers()
+-- Server hopping with random selection & fast retry
+local function hopToNewServer()
+    if isTeleporting then SendDebug("Already teleporting") return end
+    isTeleporting = true
+    teleportFailureCount = 0
+
+    if #currentServerList == 0 then
+        currentServerList = getServers()
+        serverRetryCounts = {}
+        for _,server in ipairs(currentServerList) do
+            serverRetryCounts[server.id] = 0
         end
-        if #currentServerList > 0 then
-            local idx = math.random(1, #currentServerList)
-            local server = table.remove(currentServerList, idx)
+    end
+
+    while #currentServerList > 0 do
+        local idx = math.random(1, #currentServerList)
+        local server = currentServerList[idx]
+        if not failedServerIds[server.id] and serverRetryCounts[server.id] < 5 then
+            serverRetryCounts[server.id] = serverRetryCounts[server.id] + 1
             local success, err = pcall(function()
                 TeleportService:TeleportToPlaceInstance(PlaceID, server.id, LocalPlayer)
             end)
             if success then
+                isTeleporting = false
                 return
+            else
+                teleportFailureCount = teleportFailureCount + 1
+                SendDebug("Teleport failed: "..tostring(err))
+                failedServerIds[server.id] = true
+                task.spawn(function() task.wait(1) failedServerIds[server.id] = nil end)
+                task.wait(1) -- retry quickly
             end
-        else
-            task.wait(0.5)
         end
+        table.remove(currentServerList, idx)
     end
-    SendDebug('Failed to hop within ' .. (maxTime or 30) .. 's')
+
+    currentServerList = {}
+    isTeleporting = false
+    task.wait(0.5)
+    hopToNewServer()
 end
 
 TeleportService.TeleportInitFailed:Connect(function(player, result, errorMessage, placeId, jobId)
