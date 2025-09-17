@@ -1,4 +1,3 @@
-- Optimized Brainrot Finder with randomized server hopping and fast retry
 
 -- Services
 local TeleportService = game:GetService("TeleportService")
