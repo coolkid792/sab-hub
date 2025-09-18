@@ -143,7 +143,6 @@ local function getFloorNumber(podium)
     return floorNum
 end
 
--- Process podium
 local function processPodium(podium, plotOwner, floorNum)
     local overhead
     for _, child in ipairs(podium:GetDescendants()) do
@@ -167,7 +166,7 @@ local function processPodium(podium, plotOwner, floorNum)
     elseif gen:find("K") then genNumber = genNumber * 1e3 end
     if genNumber < 1e6 then return end
 
-    -- Regular webhook notifications
+    -- Regular notifications
     local playerCount, jobId, _, joinLink = getPlayerData()
     local embed = {
         description = "# 🧠 "..name.." | 💰 "..gen.." | 👥 "..playerCount,
@@ -197,10 +196,12 @@ local function processPodium(podium, plotOwner, floorNum)
         SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
     end
 
-    -- Extra ultra high value webhook (15M+)
+    -- Ultra high 15M+ embed with footer timestamp
     if genNumber >= 15e6 then
         local formattedName = name:gsub("%s+", "")
         local thumbnailUrl = "https://raw.githubusercontent.com/coolkid792/sab-hub/main/"..formattedName..".png"
+
+        local footerTimestamp = "Today at " .. os.date("%I:%M %p")
 
         local specialEmbed = {
             title = "HIGH VALUE SECRET FOUND",
@@ -210,13 +211,15 @@ local function processPodium(podium, plotOwner, floorNum)
                 {name = "Generation", value = gen},
                 {name = "Secret", value = name}
             },
-            thumbnail = {url = thumbnailUrl}
+            thumbnail = {url = thumbnailUrl},
+            footer = {text = footerTimestamp}
         }
 
         local data = {content = nil, embeds = {specialEmbed}, attachments = {}}
         SendWebhook(ultraHighWebhookUrl, data)
     end
 end
+
 
 -- Scan plots only twice (short delay)
 local function scanPlotsTwice()
