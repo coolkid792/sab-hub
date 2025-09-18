@@ -30,12 +30,6 @@ local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l
 local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDDHTPpHsVUeOqA0Hoabz0CPznl1t4LqNiOGcgDGHT1WHRoPcoSkdSO7EM-3K2tEkhh"
 local ultraHighWebhookUrl = "https://discord.com/api/webhooks/1418234733388894359/GEMiC5lwqCiFod59U88EM8Lfkg1dc1jnjG21f1Vg_QAPPCspZ-8sUj44lhlTwEy9-eVK"
 
--- Chat messages
-local messages = { "Want servers have 10m+ Sęcret Pęts?", "Easy brainrots! ínvítạtíọn: brainrotfinder"}
-for _, msg in ipairs(messages) do
-    pcall(function() if generalChannel then generalChannel:SendAsync(msg) end end)
-    task.wait(1)
-end
 
 -- Debug helper (throttled)
 local __lastDebugAt = 0
