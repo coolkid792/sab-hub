@@ -303,34 +303,39 @@ statusLabel.TextScaled = true
 statusLabel.BackgroundTransparency = 1
 
 -- Fetch servers via Cloudflare proxy (single call, retries on failure)
+-- Optimized server fetch
 local function getServers()
     local servers = {}
     local maxAttempts = 3
     local proxyBase = "https://spring-leaf-5b44.macaroniwithtony67.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
 
     for attempt = 1, maxAttempts do
-        -- jitter to de-sync across instances
-        task.wait(0.05 + (LocalPlayer.UserId % 6) * 0.03 + math.random() * 0.07)
+        -- small jitter to desync
+        task.wait(0.05 + (LocalPlayer.UserId % 6) * 0.03 + math.random() * 0.05)
 
         local success, response = pcall(function()
             return game:HttpGet(proxyBase)
         end)
 
-        if success and response ~= "" then
+        if success and response and response ~= "" then
             local ok, data = pcall(function()
                 return HttpService:JSONDecode(response)
             end)
 
             if ok and data and data.data and type(data.data) == "table" then
                 for _, server in ipairs(data.data) do
-                    if tonumber(server.playing)
-                        and tonumber(server.maxPlayers)
-                        and server.playing < server.maxPlayers - 1
-                        and server.id
-                        and server.id ~= game.JobId then
+                    if tonumber(server.playing) and tonumber(server.maxPlayers) and
+                       server.playing < server.maxPlayers - 1 and
+                       server.id and server.id ~= game.JobId then
                         table.insert(servers, server)
                     end
                 end
+
+                -- Prioritize servers with most available slots
+                table.sort(servers, function(a, b)
+                    return (b.maxPlayers - b.playing) > (a.maxPlayers - a.playing)
+                end)
+
                 SendDebug("Fetched "..#servers.." joinable servers via proxy")
                 return servers
             else
@@ -341,31 +346,38 @@ local function getServers()
         end
 
         if attempt < maxAttempts then
-            task.wait(0.5 * (attempt + 1))
+            task.wait(0.15) -- retry faster
         end
     end
 
-    SendDebug("Proxy fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
+    SendDebug("Proxy fetch failed after "..maxAttempts.." attempts, returning 0 servers")
     return servers
 end
 
--- Server hopping with random selection & fast retry
+-- Optimized server hopping
 local function hopToNewServer()
-    if isTeleporting then SendDebug("Already teleporting") return end
+    if isTeleporting then return end
     isTeleporting = true
     teleportFailureCount = 0
 
-    if #currentServerList == 0 then
+    -- Ensure we have a fresh server list
+    currentServerList = getServers()
+    while #currentServerList == 0 do
+        SendDebug("No servers found, retrying quickly")
+        task.wait(0.1)
         currentServerList = getServers()
-        serverRetryCounts = {}
-        for _,server in ipairs(currentServerList) do
-            serverRetryCounts[server.id] = 0
-        end
+    end
+
+    serverRetryCounts = {}
+    for _, server in ipairs(currentServerList) do
+        serverRetryCounts[server.id] = 0
     end
 
     while #currentServerList > 0 do
-        local idx = math.random(1, #currentServerList)
+        local idx = 1
+        -- pick first server (already sorted by slots)
         local server = currentServerList[idx]
+
         if server and server.id and not failedServerIds[server.id] and (serverRetryCounts[server.id] or 0) < 2 then
             serverRetryCounts[server.id] = (serverRetryCounts[server.id] or 0) + 1
             local success, err = pcall(function()
@@ -378,30 +390,32 @@ local function hopToNewServer()
                 teleportFailureCount = teleportFailureCount + 1
                 SendDebug("Teleport failed: "..tostring(err))
                 failedServerIds[server.id] = true
-                task.spawn(function() task.wait(0.75) failedServerIds[server.id] = nil end)
-                task.wait(0.25 + math.random() * 0.1)
+                task.spawn(function() task.wait(0.2) failedServerIds[server.id] = nil end)
             end
         end
         table.remove(currentServerList, idx)
+        task.wait(0.05 + math.random() * 0.05)
     end
 
-    currentServerList = {}
+    -- If all servers failed, retry fetch immediately
     isTeleporting = false
-    task.wait(0.35 + math.random() * 0.15)
+    task.wait(0.1)
     hopToNewServer()
 end
 
+-- Teleport failure handling (unchanged, but faster recovery)
 TeleportService.TeleportInitFailed:Connect(function(player, result, errorMessage, placeId, jobId)
     teleportFailureCount = teleportFailureCount + 1
     SendDebug("Teleport failed for "..player.Name..": "..tostring(errorMessage))
     isTeleporting = false
     if jobId and type(jobId)=="string" then
         failedServerIds[jobId] = true
-        task.spawn(function() task.wait(0.75) failedServerIds[jobId] = nil end)
+        task.spawn(function() task.wait(0.2) failedServerIds[jobId] = nil end)
     end
-    task.wait(0.35 + math.random() * 0.15)
+    task.wait(0.1)
     hopToNewServer()
 end)
+
 
 -- Stuck teleport timeout (faster recovery)
 task.spawn(function()
