@@ -214,26 +214,42 @@ end
 local function scanPlotsTwice()
     local function scanOnce()
         local plotsFolder = Workspace:FindFirstChild("Plots")
-        if not plotsFolder then SendDebug("Plots folder not found.") return 0 end
+        if not plotsFolder then
+            SendDebug("Plots folder not found.")
+            return 0
+        end
+
         local found = 0
-        for _,playerBase in ipairs(plotsFolder:GetChildren()) do
+        for _, playerBase in ipairs(plotsFolder:GetChildren()) do
             local plotOwner = getPlotOwner(playerBase)
             local podiumsFolder = playerBase:FindFirstChild("AnimalPodiums")
             if podiumsFolder then
-                for _,podium in ipairs(podiumsFolder:GetChildren()) do
+                for _, podium in ipairs(podiumsFolder:GetChildren()) do
                     local floorNum = getFloorNumber(podium)
-                    pcall(function() processPodium(podium, plotOwner, floorNum) found = found+1 end)
+                    found = found + 1 -- increment first so we don’t lose the count
+                    local ok, err = pcall(function()
+                        processPodium(podium, plotOwner, floorNum)
+                    end)
+                    if not ok then
+                        SendDebug("processPodium failed: "..tostring(err))
+                    end
                 end
             end
         end
+
         SendDebug("Scan found "..found.." podiums.")
         return found
     end
 
     SendDebug("Starting first scan.")
-    scanOnce()
-    SendDebug("Finished scanning plots.")
+    local totalFound = scanOnce()
+    SendDebug("Finished first scan ("..totalFound.." podiums).")
+
+    task.wait(4) -- give time for any late spawns to appear
+    local secondFound = scanOnce()
+    SendDebug("Finished second scan ("..secondFound.." podiums).")
 end
+
 
 -- Lightweight workspace optimization (fast on multi-instance)
 pcall(function()
