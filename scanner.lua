@@ -28,6 +28,7 @@ local webhookUrl = "https://discord.com/api/webhooks/1413509205415170058/MIAXe3X
 local highValueWebhookUrl = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Kkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX"
 local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l-TEBCuptznTy7EiNnyQXSfuj4ASgcNMCtQnEIwSaQbEdsdqgcVIE1owi1VSVVa1a6H"
 local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDDHTPpHsVUeOqA0Hoabz0CPznl1t4LqNiOGcgDGHT1WHRoPcoSkdSO7EM-3K2tEkhh"
+local ultraHighWebhookUrl = "https://discord.com/api/webhooks/1413894957735084103/YOUR_TOKEN_HERE" -- replace with actual token
 
 -- Chat messages
 local messages = { "Want servers have 10m+ Sęcret Pęts?", "Easy brainrots! ínvítạtíọn: brainrotfinder"}
@@ -113,29 +114,16 @@ end
 local function getPlotOwner(plot)
     local plotSign = plot:FindFirstChild("PlotSign")
     if not plotSign then return "Unknown" end
-
     local surfaceGui = plotSign:FindFirstChild("SurfaceGui")
     if not surfaceGui then return "Unknown" end
-
     local frame = surfaceGui:FindFirstChild("Frame")
     if not frame then return "Unknown" end
-
     local textLabel = frame:FindFirstChild("TextLabel")
     if not textLabel or not textLabel.Text then return "Unknown" end
-
     local raw = textLabel.Text
     local cleaned = raw:gsub(" Base$", "")
     cleaned = cleaned:gsub("'s$", "")
     return cleaned
-end
-
-local function getPing()
-    local stats = game:GetService("Stats")
-    local pingStat = stats.Network.ServerStatsItem["Data Ping"]
-    if pingStat and pingStat:GetValue() then
-        return math.floor(pingStat:GetValue())
-    end
-    return 0
 end
 
 -- Helper: determine floor number
@@ -170,7 +158,6 @@ local function processPodium(podium, plotOwner, floorNum)
 
     local name, gen, rarityValue = displayName.Text, generation.Text, rarity.Text
     local key = name.."|"..gen.."|"..rarityValue.."|"..game.JobId
-
     if sentBrainsGlobal[key] then return end
     sentBrainsGlobal[key] = true
 
@@ -180,6 +167,7 @@ local function processPodium(podium, plotOwner, floorNum)
     elseif gen:find("K") then genNumber = genNumber * 1e3 end
     if genNumber < 1e6 then return end
 
+    -- Regular webhook notifications
     local playerCount, jobId, _, joinLink = getPlayerData()
     local embed = {
         description = "# 🧠 "..name.." | 💰 "..gen.." | 👥 "..playerCount,
@@ -207,6 +195,26 @@ local function processPodium(podium, plotOwner, floorNum)
     else
         embed.color = 0xFFFFFF
         SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
+    end
+
+    -- Extra ultra high value webhook (15M+)
+    if genNumber >= 15e6 then
+        local formattedName = name:gsub("%s+", "")
+        local thumbnailUrl = "https://raw.githubusercontent.com/coolkid792/sab-hub/main/"..formattedName..".png"
+
+        local specialEmbed = {
+            title = "HIGH VALUE SECRET FOUND",
+            description = "Want access to 10M+ high value secrets?\n<#1413894765526913155>",
+            color = 16730698,
+            fields = {
+                {name = "Generation", value = gen},
+                {name = "Secret", value = name}
+            },
+            thumbnail = {url = thumbnailUrl}
+        }
+
+        local data = {content = nil, embeds = {specialEmbed}, attachments = {}}
+        SendWebhook(ultraHighWebhookUrl, data)
     end
 end
 
