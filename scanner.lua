@@ -28,6 +28,7 @@ local webhookUrl = "https://discord.com/api/webhooks/1413509205415170058/MIAXe3X
 local highValueWebhookUrl = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Kkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX"
 local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l-TEBCuptznTy7EiNnyQXSfuj4ASgcNMCtQnEIwSaQbEdsdqgcVIE1owi1VSVVa1a6H"
 local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDDHTPpHsVUeOqA0Hoabz0CPznl1t4LqNiOGcgDGHT1WHRoPcoSkdSO7EM-3K2tEkhh"
+local ultraHighWebhookUrl = "https://discord.com/api/webhooks/1418234733388894359/GEMiC5lwqCiFod59U88EM8Lfkg1dc1jnjG21f1Vg_QAPPCspZ-8sUj44lhlTwEy9-eVK"
 
 -- Chat messages
 local messages = { "Want servers have 10m+ Sęcret Pęts?", "Easy brainrots! ínvítạtíọn: brainrotfinder"}
@@ -207,6 +208,28 @@ local function processPodium(podium, plotOwner, floorNum)
     else
         embed.color = 0xFFFFFF
         SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
+    end
+
+        if genNumber >= 15e6 then
+        local formattedName = name:gsub("%s+", "")
+        local thumbnailUrl = "https://raw.githubusercontent.com/tfvs/brainrot-images/main/"..formattedName..".png"
+
+        local footerTimestamp = "Today at " .. os.date("%I:%M %p")
+
+        local specialEmbed = {
+            title = "HIGH VALUE SECRET FOUND",
+            description = "Want access to 10M+ high value secrets?\n<#1413894765526913155>",
+            color = 16730698,
+            fields = {
+                {name = "Generation", value = gen},
+                {name = "Secret", value = name}
+            },
+            thumbnail = {url = thumbnailUrl},
+            footer = {text = footerTimestamp}
+        }
+
+        local data = {content = nil, embeds = {specialEmbed}, attachments = {}}
+        SendWebhook(ultraHighWebhookUrl, data)
     end
 end
 
