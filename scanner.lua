@@ -198,7 +198,7 @@ local function processPodium(podium, plotOwner, floorNum)
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
-    if genNumber >= 1e7 then
+    if genNumber >= 8.5e6 then
         embed.color, embed.ping = 0xFF0000, true
         SendMessageEMBED({highValueWebhookUrl}, embed)
     elseif genNumber >= 5e6 then
@@ -396,13 +396,16 @@ task.spawn(function()
 end)
 
 -- Main loop: Scan and hop sequentially
+-- Main loop: Scan and hop sequentially
 task.spawn(function()
+    task.wait(12) -- Wait 15 seconds after joining before doing anything
     while true do
         SendDebug("Starting scan and hop cycle.")
         scanPlotsTwice() -- Complete the full scan (two passes with 4-second delay)
         task.wait(1) -- Small buffer to ensure scanning is fully complete
-        SendDebug("Initiating server hop.")
+        SendDebug("Initiating server hop. 1")
         hopToNewServer() -- Hop to a new server after scanning
         task.wait(1) -- Small delay before starting the next cycle
     end
 end)
+
