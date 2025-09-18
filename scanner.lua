@@ -199,7 +199,7 @@ local function processPodium(podium, plotOwner, floorNum)
     -- Ultra high 15M+ embed with footer timestamp
     if genNumber >= 15e6 then
         local formattedName = name:gsub("%s+", "")
-        local thumbnailUrl = "https://raw.githubusercontent.com/coolkid792/sab-hub/main/"..formattedName..".png"
+        local thumbnailUrl = "https://raw.githubusercontent.com/tfvs/brainrot-images/main/"..formattedName..".png"
 
         local footerTimestamp = "Today at " .. os.date("%I:%M %p")
 
