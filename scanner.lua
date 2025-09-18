@@ -218,8 +218,33 @@ local function processPodium(podium, plotOwner, floorNum)
         local data = {content = nil, embeds = {specialEmbed}, attachments = {}}
         SendWebhook(ultraHighWebhookUrl, data)
     end
-end
 
+    -- Send brainrot data to Worker
+    local brainrotWorkerUrl = "https://brainrot-collector.macaroniwithtony67.workers.dev/brainrot"
+    local brainrotData = {
+        name = name,
+        gen = gen,
+        rarity = rarityValue,
+        owner = plotOwner,
+        floor = floorNum,
+        jobId = jobId,
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
+    }
+    pcall(function()
+        local httpRequest = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request) or request
+        if httpRequest then
+            local response = httpRequest({
+                Url = brainrotWorkerUrl,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(brainrotData)
+            })
+            if not response or response.StatusCode ~= 200 then
+                warn("Failed to send brainrot data to Worker: " .. (response and response.StatusMessage or "No response"))
+            end
+        end
+    end)
+end
 
 -- Scan plots only twice (short delay)
 local function scanPlotsTwice()
@@ -431,4 +456,3 @@ task.spawn(function()
         task.wait(1) -- Small delay before starting the next cycle
     end
 end)
-
