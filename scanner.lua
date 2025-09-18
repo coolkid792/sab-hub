@@ -277,57 +277,50 @@ statusLabel.TextColor3 = Color3.new(0,0,0)
 statusLabel.TextScaled = true
 statusLabel.BackgroundTransparency = 1
 
--- Fetch servers (keeps game:HttpGet, retries decoupled from pagination + jitter)
+-- Fetch servers via Cloudflare proxy (single call, retries on failure)
 local function getServers()
 	local servers = {}
 	local maxAttempts = 3
+	local proxyBase = "https://lingering-smoke-afa1.aarislmao827.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
 
 	for attempt = 1, maxAttempts do
-		local cursor = nil
-		repeat
-			local url = "https://games.roblox.com/v1/games/"..PlaceID.."/servers/Public?sortOrder=Asc&limit=100"
-			if cursor then
-				url = url .. "&cursor=" .. cursor
-			end
+		-- jitter to de-sync across instances
+		task.wait(0.05 + (LocalPlayer.UserId % 6) * 0.03 + math.random() * 0.07)
 
-			-- jitter to de-sync across 6 instances
-			task.wait(0.05 + (LocalPlayer.UserId % 6) * 0.03 + math.random() * 0.07)
+		local success, response = pcall(function()
+			return game:HttpGet(proxyBase)
+		end)
 
-			local success, response = pcall(function()
-				return game:HttpGet(url)
+		if success and response ~= "" then
+			local ok, data = pcall(function()
+				return HttpService:JSONDecode(response)
 			end)
 
-			if success and response ~= "" then
-				local ok, data = pcall(function()
-					return HttpService:JSONDecode(response)
-				end)
-
-				if ok and data and data.data then
-					for _, server in ipairs(data.data) do
-						if tonumber(server.playing)
-							and tonumber(server.maxPlayers)
-							and server.playing < server.maxPlayers - 1
-							and server.id
-							and server.id ~= game.JobId then
-							table.insert(servers, server)
-						end
+			if ok and data and data.data and type(data.data) == "table" then
+				for _, server in ipairs(data.data) do
+					if tonumber(server.playing)
+						and tonumber(server.maxPlayers)
+						and server.playing < server.maxPlayers - 1
+						and server.id
+						and server.id ~= game.JobId then
+						table.insert(servers, server)
 					end
-					cursor = data.nextPageCursor
-				else
-					SendDebug("Failed to parse server list on attempt "..attempt)
-					cursor = nil
 				end
+				SendDebug("Fetched "..#servers.." joinable servers via proxy")
+				return servers
 			else
-				SendDebug("Failed to fetch server list on attempt "..attempt)
-				cursor = nil
+				SendDebug("Failed to parse proxy response on attempt "..attempt)
 			end
-		until (not cursor) or (#servers > 0)
+		else
+			SendDebug("Failed to fetch from proxy on attempt "..attempt)
+		end
 
-		if #servers > 0 then break end
-		task.wait(0.5 * (attempt + 1))
+		if attempt < maxAttempts then
+			task.wait(0.5 * (attempt + 1))
+		end
 	end
 
-	SendDebug("Fetched "..#servers.." joinable servers")
+	SendDebug("Proxy fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
 	return servers
 end
 
