@@ -232,9 +232,6 @@ local function scanPlotsTwice()
 
     SendDebug("Starting first scan.")
     scanOnce()
-    task.wait(4)
-    SendDebug("Starting second scan.")
-    scanOnce()
     SendDebug("Finished scanning plots.")
 end
 
@@ -398,12 +395,11 @@ end)
 -- Main loop: Scan and hop sequentially
 -- Main loop: Scan and hop sequentially
 task.spawn(function()
-    task.wait(12) -- Wait 15 seconds after joining before doing anything
     while true do
         SendDebug("Starting scan and hop cycle.")
         scanPlotsTwice() -- Complete the full scan (two passes with 4-second delay)
         task.wait(1) -- Small buffer to ensure scanning is fully complete
-        SendDebug("Initiating server hop. 1")
+        SendDebug("Initiating server hops.")
         hopToNewServer() -- Hop to a new server after scanning
         task.wait(1) -- Small delay before starting the next cycle
     end
