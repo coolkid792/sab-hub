@@ -30,6 +30,7 @@ local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l
 local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDDHTPpHsVUeOqA0Hoabz0CPznl1t4LqNiOGcgDGHT1WHRoPcoSkdSO7EM-3K2tEkhh"
 local ultraHighWebhookUrl = "https://discord.com/api/webhooks/1418234733388894359/GEMiC5lwqCiFod59U88EM8Lfkg1dc1jnjG21f1Vg_QAPPCspZ-8sUj44lhlTwEy9-eVK"
 
+
 -- Debug helper (throttled)
 local __lastDebugAt = 0
 local function SendDebug(msg, attempts)
@@ -203,7 +204,7 @@ local function processPodium(podium, plotOwner, floorNum)
         SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
     end
 
-    if genNumber >= 15e6 then
+        if genNumber >= 15e6 then
         local formattedName = name:gsub("%s+", "")
         local thumbnailUrl = "https://raw.githubusercontent.com/tfvs/brainrot-images/main/"..formattedName..".png"
 
@@ -291,18 +292,18 @@ statusLabel.TextColor3 = Color3.new(0,0,0)
 statusLabel.TextScaled = true
 statusLabel.BackgroundTransparency = 1
 
--- Fetch servers via Roblox API (100 servers, ascending order, retries on failure)
+-- Fetch servers via Cloudflare proxy (single call, retries on failure)
 local function getServers()
     local servers = {}
     local maxAttempts = 3
-    local apiUrl = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100"
+    local proxyBase = "https://spring-leaf-5b44.macaroniwithtony67.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
 
     for attempt = 1, maxAttempts do
         -- jitter to de-sync across instances
         task.wait(0.05 + (LocalPlayer.UserId % 6) * 0.03 + math.random() * 0.07)
 
         local success, response = pcall(function()
-            return game:HttpGet(apiUrl)
+            return game:HttpGet(proxyBase)
         end)
 
         if success and response ~= "" then
@@ -320,13 +321,13 @@ local function getServers()
                         table.insert(servers, server)
                     end
                 end
-                SendDebug("Fetched "..#servers.." joinable servers via Roblox API")
+                SendDebug("Fetched "..#servers.." joinable servers via proxy")
                 return servers
             else
-                SendDebug("Failed to parse Roblox API response on attempt "..attempt)
+                SendDebug("Failed to parse proxy response on attempt "..attempt)
             end
         else
-            SendDebug("Failed to fetch from Roblox API on attempt "..attempt)
+            SendDebug("Failed to fetch from proxy on attempt "..attempt)
         end
 
         if attempt < maxAttempts then
@@ -334,7 +335,7 @@ local function getServers()
         end
     end
 
-    SendDebug("Roblox API fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
+    SendDebug("Proxy fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
     return servers
 end
 
@@ -409,11 +410,12 @@ task.spawn(function()
 end)
 
 -- Main loop: Scan and hop sequentially
+-- Main loop: Scan and hop sequentially
 task.spawn(function()
     while true do
         SendDebug("Starting scan and hop cycle.")
         scanPlotsTwice() -- Complete the full scan (two passes with 4-second delay)
-        task.wait(10) -- Small buffer to ensure scanning is fully complete
+        task.wait(3) -- Small buffer to ensure scanning is fully complete
         SendDebug("Initiating server hops.")
         hopToNewServer() -- Hop to a new server after scanning
         task.wait(2) -- Small delay before starting the next cycle
