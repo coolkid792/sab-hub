@@ -204,7 +204,7 @@ local function processPodium(podium, plotOwner, floorNum)
         SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
     end
 
-        if genNumber >= 15e6 then
+        if genNumber >= 20e6 then
         local formattedName = name:gsub("%s+", "")
         local thumbnailUrl = "https://raw.githubusercontent.com/tfvs/brainrot-images/main/"..formattedName..".png"
 
