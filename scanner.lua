@@ -193,7 +193,7 @@ local function processPodium(podium, plotOwner, floorNum)
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
-    if genNumber >= 15e6 then
+    if genNumber >= 20e6 then
         embed.color, embed.ping = 0xFF0000, true
         SendMessageEMBED({highValueWebhookUrl}, embed)
     elseif genNumber >= 5e6 then
