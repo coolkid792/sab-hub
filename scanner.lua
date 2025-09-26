@@ -237,7 +237,7 @@ local function processPodium(podium, plotOwner, floorNum)
 
         local specialEmbed = {
             title = "HIGH VALUE SECRET FOUND",
-            description = "Want access to 5M+ high value secrets?\n<#1413894765526913155>",
+            description = "Want access to high end secrets?\n<#1413894765526913155>",
             color = 16730698,
             fields = {
                 {name = "Generation", value = gen},
