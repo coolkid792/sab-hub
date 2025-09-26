@@ -30,6 +30,14 @@ local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l
 local zzzHubWebhook = "https://discord.com/api/webhooks/1416751065080008714/0PDDHTPpHsVUeOqA0Hoabz0CPznl1t4LqNiOGcgDGHT1WHRoPcoSkdSO7EM-3K2tEkhh"
 local ultraHighWebhookUrl = "https://discord.com/api/webhooks/1418234733388894359/GEMiC5lwqCiFod59U88EM8Lfkg1dc1jnjG21f1Vg_QAPPCspZ-8sUj44lhlTwEy9-eVK"
 
+-- Specific brainrots that should go to normal webhook even with high generation
+local normalWebhookBrainrots = {
+    "Dul Dul Dul",
+    "Chachechi", 
+    "La Cucaracha",
+    "Sammyni Spyderini",
+    "La Vacca Saturno Saturnita"
+}
 
 -- Debug helper (throttled)
 local __lastDebugAt = 0
@@ -152,6 +160,16 @@ local function getFloorNumber(podium)
     return floorNum
 end
 
+-- Check if brainrot should go to normal webhook
+local function shouldUseNormalWebhook(brainrotName)
+    for _, normalName in ipairs(normalWebhookBrainrots) do
+        if brainrotName == normalName then
+            return true
+        end
+    end
+    return false
+end
+
 -- Process podium
 local function processPodium(podium, plotOwner, floorNum)
     local overhead
@@ -195,7 +213,11 @@ local function processPodium(podium, plotOwner, floorNum)
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
-    if genNumber >= 15e6 then
+    -- Check if this brainrot should use normal webhook regardless of generation
+    if shouldUseNormalWebhook(name) then
+        embed.color = 0xFFFFFF
+        SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
+    elseif genNumber >= 15e6 then
         embed.color, embed.ping = 0xFF0000, true
         SendMessageEMBED({highValueWebhookUrl}, embed)
     elseif genNumber >= 5e6 then
@@ -206,7 +228,8 @@ local function processPodium(podium, plotOwner, floorNum)
         SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
     end
 
-        if genNumber >= 15e6 then
+    -- Ultra high value special embed (only for non-normal webhook brainrots)
+    if genNumber >= 15e6 and not shouldUseNormalWebhook(name) then
         local formattedName = name:gsub("%s+", "")
         local thumbnailUrl = "https://raw.githubusercontent.com/tfvs/brainrot-images/main/"..formattedName..".png"
 
@@ -411,7 +434,6 @@ task.spawn(function()
     end
 end)
 
--- Main loop: Scan and hop sequentially
 -- Main loop: Scan and hop sequentially
 task.spawn(function()
     while true do
