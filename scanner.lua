@@ -57,6 +57,8 @@ local function SendDebug(msg, attempts)
     end)
 end
 
+setfpscap(15)
+
 -- Send Webhook (patched)
 local function SendWebhook(url, data)
     local httpRequest = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request) or request
