@@ -193,7 +193,7 @@ local function processPodium(podium, plotOwner, floorNum)
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
-    if genNumber >= 20e6 then
+    if genNumber >= 15e6 then
         embed.color, embed.ping = 0xFF0000, true
         SendMessageEMBED({highValueWebhookUrl}, embed)
     elseif genNumber >= 5e6 then
@@ -204,7 +204,7 @@ local function processPodium(podium, plotOwner, floorNum)
         SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
     end
 
-        if genNumber >= 20e6 then
+        if genNumber >= 15e6 then
         local formattedName = name:gsub("%s+", "")
         local thumbnailUrl = "https://raw.githubusercontent.com/tfvs/brainrot-images/main/"..formattedName..".png"
 
@@ -212,7 +212,7 @@ local function processPodium(podium, plotOwner, floorNum)
 
         local specialEmbed = {
             title = "HIGH VALUE SECRET FOUND",
-            description = "Want access to 10M+ high value secrets?\n<#1413894765526913155>",
+            description = "Want access to 5M+ high value secrets?\n<#1413894765526913155>",
             color = 16730698,
             fields = {
                 {name = "Generation", value = gen},
