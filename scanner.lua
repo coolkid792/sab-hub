@@ -206,7 +206,7 @@ local function processPodium(podium, plotOwner, floorNum)
             {name="✨ Rarity", value=rarityValue, inline=true},
             {name="☀️ Owner", value=plotOwner.." (Floor "..floorNum..")", inline=true},
             {name="🆔 Job ID", value="```"..jobId.."```"},
-            {name="💻 Join Script", value="`\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance("..PlaceID..",\""..jobId.."\",game.Players.LocalPlayer)\n`"},
+            {name="💻 Join Script", value="`game:GetService(\"TeleportService\"):TeleportToPlaceInstance("..PlaceID..",\""..jobId.."\",game.Players.LocalPlayer)\n`"},
             {name="🔗 Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"}
         },
         author = {name="🧩 Puzzle's Notifier"},
