@@ -36,7 +36,8 @@ local normalWebhookBrainrots = {
     "Chachechi", 
     "La Cucaracha",
     "Sammyni Spyderini",
-    "La Vacca Saturno Saturnita"
+    "La Vacca Saturno Saturnita",
+    "Crabbo Limonetta"
 }
 
 -- Debug helper (throttled)
