@@ -318,18 +318,18 @@ statusLabel.TextColor3 = Color3.new(0,0,0)
 statusLabel.TextScaled = true
 statusLabel.BackgroundTransparency = 1
 
--- Fetch servers via Cloudflare proxy (single call, retries on failure)
+-- Fetch servers via direct Roblox API (Asc order, limit 100 per request)
 local function getServers()
     local servers = {}
     local maxAttempts = 3
-    local proxyBase = "https://spring-leaf-5b44.macaroniwithtony67.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
+    local apiBase = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100"
 
     for attempt = 1, maxAttempts do
         -- jitter to de-sync across instances
         task.wait(0.05 + (LocalPlayer.UserId % 6) * 0.03 + math.random() * 0.07)
 
         local success, response = pcall(function()
-            return game:HttpGet(proxyBase)
+            return game:HttpGet(apiBase)
         end)
 
         if success and response ~= "" then
@@ -347,13 +347,13 @@ local function getServers()
                         table.insert(servers, server)
                     end
                 end
-                SendDebug("Fetched "..#servers.." joinable servers via proxy")
+                SendDebug("Fetched "..#servers.." joinable servers via direct API")
                 return servers
             else
-                SendDebug("Failed to parse proxy response on attempt "..attempt)
+                SendDebug("Failed to parse API response on attempt "..attempt)
             end
         else
-            SendDebug("Failed to fetch from proxy on attempt "..attempt)
+            SendDebug("Failed to fetch from API on attempt "..attempt)
         end
 
         if attempt < maxAttempts then
@@ -361,7 +361,7 @@ local function getServers()
         end
     end
 
-    SendDebug("Proxy fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
+    SendDebug("API fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
     return servers
 end
 
