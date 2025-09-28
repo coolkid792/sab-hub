@@ -381,7 +381,7 @@ statusLabel.BackgroundTransparency = 1
 local function getServers()
     local servers = {}
     local maxAttempts = 3
-    local proxyBase = "https://morning-wind-4aa7.verifybot17.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
+    local proxyBase = "https://lingering-smoke-afa1.aarislmao827.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
 
     for attempt = 1, maxAttempts do
         -- jitter to de-sync across instances
