@@ -8,12 +8,13 @@ local scannedBrainrots = {}
 local freeWebhookUrl = "https://discord.com/api/webhooks/1413509205415170058/MIAXe3Xyt_gNhvRlaPALmEy6jWtD1Y6D6Q9SDdlzGdRGXyPnUDekeg_bGyF5-Js5aJde"
 local paidWebhookUrl = "https://discord.com/api/webhooks/1413908979930628469/EjsDg2kHlaCkCt8vhsLR4tjtH4Kkq-1XWHl1gQwjdgEs6TinMs6m0JInfk2B_RSv4fbX"
 local debugWebhookUrl = "https://discord.com/api/webhooks/1413717796122001418/-l-TEBCuptznTy7EiNnyQXSfuj4ASgcNMCtQnEIwSaQbEdsdqgcVIE1owi1VSVVa1a6H"
-local serverApiUrl = "https://spring-leaf-5b44.macaroniwithtony67.workers.dev/servers"
+local ultraHighWebhookUrl = "https://discord.com/api/webhooks/1418234733388894359/GEMiC5lwqCiFod59U88EM8Lfkg1dc1jnjG21f1Vg_QAPPCspZ-8sUj44lhlTwEy9-eVK"
+local serverApiUrl = "https://morning-wind-4aa7.verifybot17.workers.dev/servers"
 
 -- Special brainrot names that always go to free webhook
 local specialBrainrotNames = {
     "Dul Dul Dul",
-    "Chachechi",
+    "Chachechi", 
     "La Cucaracha",
     "Sammyni Spyderini",
     "La Vacca Saturno Saturnita",
@@ -50,7 +51,7 @@ local function sendDebugMessage(description, startTime)
     local minutes = math.floor(elapsedTime / 60)
     local seconds = elapsedTime % 60
     local timeString = string.format("%dm %ds", minutes, seconds)
-
+    
     local debugData = {
         content = nil,
         embeds = {
@@ -68,7 +69,7 @@ local function sendDebugMessage(description, startTime)
         },
         attachments = {}
     }
-
+    
     local success, response = pcall(function()
         return request({
             Url = debugWebhookUrl,
@@ -108,9 +109,9 @@ end
 local function getServerList(startTime)
     local maxAttempts = 3
     local proxyBase = serverApiUrl .. "/" .. game.PlaceId .. "?excludeJobId=" .. (game.JobId or "")
-
+    
     sendDebugMessage("Fetching server list... (attempt 1/" .. maxAttempts .. ")", startTime)
-
+    
     for attempt = 1, maxAttempts do
         wait(0.05 + (players.LocalPlayer.UserId % 6) * 0.03 + math.random() * 0.07)
         local success, response = pcall(function()
@@ -137,8 +138,8 @@ local function getServerList(startTime)
                 if ok and data and data.data and type(data.data) == "table" then
                     local servers = {}
                     for _, server in pairs(data.data) do
-                        if tonumber(server.playing) and tonumber(server.maxPlayers) and
-                           server.playing < server.maxPlayers - 1 and
+                        if tonumber(server.playing) and tonumber(server.maxPlayers) and 
+                           server.playing < server.maxPlayers - 1 and 
                            server.id and server.id ~= game.JobId then
                             table.insert(servers, server)
                         end
@@ -261,15 +262,34 @@ brainrotMutation = "None"
 end
 end
 local brainrotTraits = extractTraits(animalOverhead)
+local floorNum = getFloorNumber(podiumModel)
 return {
 Name = brainrotName,
 Generation = brainrotGeneration,
 Rarity = brainrotRarity,
 Mutation = brainrotMutation,
 Traits = brainrotTraits,
-Owner = plotOwner
+Owner = plotOwner,
+Floor = floorNum
 }
 end
+-- Helper: determine floor number
+local function getFloorNumber(podium)
+    local parentName = podium.Name
+    local floorNum = 1
+    local num = tonumber(parentName)
+    if num then
+        if num >= 1 and num <= 10 then
+            floorNum = 1
+        elseif num >= 11 and num <= 18 then
+            floorNum = 2
+        else
+            floorNum = 3
+        end
+    end
+    return floorNum
+end
+
 local function getPlotOwner(plotModel)
 local plotSign = plotModel:FindFirstChild("PlotSign")
 if not plotSign then return "Unknown" end
@@ -291,7 +311,7 @@ local function getWebhookUrl(brainrotName, genNumber)
             return freeWebhookUrl
         end
     end
-
+    
     -- Route based on generation
     if genNumber >= 5000000 then -- 5M+
         return paidWebhookUrl
@@ -314,7 +334,7 @@ local function sendToWebhook(data, webhookUrl)
             Body = game:GetService("HttpService"):JSONEncode(data)
         })
     end)
-
+    
     if success then
         print("Successfully sent data to Discord webhook")
     else
@@ -354,14 +374,14 @@ end
 local function main()
     local startTime = os.time()
     print("=== Brainrot Scanner Started ===")
-
+    
     -- Send initial debug message
     sendDebugMessage("Starting brainrot scanner...", startTime)
-
+    
     -- Optimize game for maximum FPS
     optimizeGame()
     sendDebugMessage("Game optimized for maximum performance", startTime)
-
+    
     local plotsFolder = workspace:WaitForChild("Plots", 10)
     if not plotsFolder then
         sendDebugMessage("ERROR: Plots folder not found!", startTime)
@@ -373,22 +393,22 @@ local function main()
             table.insert(plotModels, child)
         end
     end
-
+    
     sendDebugMessage("Found " .. #plotModels .. " plot models, starting scan...", startTime)
-
+    
     for i, plotModel in pairs(plotModels) do
         scanPlot(plotModel)
         wait(0.1)
     end
-
+    
     sendDebugMessage("First scan complete! Found " .. #brainrotTable .. " brainrots", startTime)
-
+    
     local placeId = game.PlaceId
     local jobId = game.JobId
     local joinLink = jobId == "N/A" and "N/A (Public server)" or string.format("https://tfvs.github.io/roblox-scripts/?placeId=%d&gameInstanceId=%s", placeId, jobId)
-
+    
     sendDebugMessage("Sending " .. #brainrotTable .. " brainrots to webhooks...", startTime)
-
+    
     for i, brainrot in pairs(brainrotTable) do
     local genNumber = 0
     local genText = brainrot.Generation
@@ -401,10 +421,10 @@ local function main()
             genNumber = genNumber * 1000
         end
     end
-
+    
     -- Determine which webhook to use
     local targetWebhookUrl = getWebhookUrl(brainrot.Name, genNumber)
-
+    
     -- Only send if we have a valid webhook URL
     if targetWebhookUrl then
         local embedColor = 0xFFFFFF
@@ -415,7 +435,7 @@ local function main()
         elseif genNumber >= 5000000 then
             embedColor = 0xFFA500
         end
-
+        
         local brainrotData = {
             content = shouldPing and "<@&1414068044480774185>" or nil,
             embeds = {
@@ -429,7 +449,7 @@ local function main()
                         {name="✨ Rarity", value=brainrot.Rarity, inline=true},
                         {name="🧬 Mutation", value=brainrot.Mutation, inline=true},
                         {name="🎭 Traits", value=brainrot.Traits, inline=true},
-                        {name="☀️ Owner", value=brainrot.Owner, inline=true},
+                        {name="☀️ Owner", value=brainrot.Owner .. " (Floor " .. brainrot.Floor .. ")", inline=true},
                         {name="🆔 Job ID", value="```"..jobId.."```"},
                         {name="💻 Join Script", value="```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance("..placeId..",\""..jobId.."\",game.Players.LocalPlayer)\n```"},
                         {name="🔗 Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"}
@@ -440,15 +460,48 @@ local function main()
                 }
             }
         }
-
+        
         sendToWebhook(brainrotData, targetWebhookUrl)
+        
+        -- Ultra high value special embed (only for non-special brainrots)
+        if genNumber >= 15000000 then
+            local isSpecialName = false
+            for _, specialName in pairs(specialBrainrotNames) do
+                if brainrot.Name == specialName then
+                    isSpecialName = true
+                    break
+                end
+            end
+            
+            if not isSpecialName then
+                local formattedName = brainrot.Name:gsub("%s+", "")
+                local thumbnailUrl = "https://raw.githubusercontent.com/tfvs/brainrot-images/main/"..formattedName..".png"
+                local footerTimestamp = "Today at " .. os.date("%I:%M %p")
+                
+                local specialEmbed = {
+                    title = "HIGH VALUE SECRET FOUND",
+                    description = "Want access to high end secrets?\n<#1413894765526913155>",
+                    color = 16730698,
+                    fields = {
+                        {name = "Generation", value = brainrot.Generation},
+                        {name = "Secret", value = brainrot.Name}
+                    },
+                    thumbnail = {url = thumbnailUrl},
+                    footer = {text = footerTimestamp}
+                }
+                
+                local ultraData = {content = nil, embeds = {specialEmbed}, attachments = {}}
+                sendToWebhook(ultraData, ultraHighWebhookUrl)
+            end
+        end
+        
         wait(0.5)
     end
     end
-
+    
     sendDebugMessage("All brainrots sent! Waiting 10 seconds for second scan...", startTime)
     wait(10)
-
+    
     sendDebugMessage("Starting second scan for new brainrots...", startTime)
     local newBrainrots = {}
     for _, plotModel in pairs(plotModels) do
@@ -471,7 +524,7 @@ local function main()
         end
         wait(0.1)
     end
-
+    
     if #newBrainrots > 0 then
         sendDebugMessage("Found " .. #newBrainrots .. " new brainrots in second scan!", startTime)
         for _, brainrot in pairs(newBrainrots) do
@@ -486,10 +539,10 @@ local function main()
                     genNumber = genNumber * 1000
                 end
             end
-
+            
             -- Determine which webhook to use
             local targetWebhookUrl = getWebhookUrl(brainrot.Name, genNumber)
-
+            
             -- Only send if we have a valid webhook URL
             if targetWebhookUrl then
                 local embedColor = 0xFFFFFF
@@ -500,7 +553,7 @@ local function main()
                 elseif genNumber >= 5000000 then
                     embedColor = 0xFFA500
                 end
-
+                
                 local brainrotData = {
                     content = shouldPing and "<@&1414068044480774185>" or nil,
                     embeds = {
@@ -514,7 +567,7 @@ local function main()
                                 {name="✨ Rarity", value=brainrot.Rarity, inline=true},
                                 {name="🧬 Mutation", value=brainrot.Mutation, inline=true},
                                 {name="🎭 Traits", value=brainrot.Traits, inline=true},
-                                {name="☀️ Owner", value=brainrot.Owner, inline=true},
+                                {name="☀️ Owner", value=brainrot.Owner .. " (Floor " .. brainrot.Floor .. ")", inline=true},
                                 {name="🆔 Job ID", value="```"..jobId.."```"},
                                 {name="💻 Join Script", value="```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance("..placeId..",\""..jobId.."\",game.Players.LocalPlayer)\n```"},
                                 {name="🔗 Join Link", value=jobId=="N/A" and "N/A" or "[Click to Join]("..joinLink..")"}
@@ -525,26 +578,60 @@ local function main()
                         }
                     }
                 }
+                
                 sendToWebhook(brainrotData, targetWebhookUrl)
+                
+                -- Ultra high value special embed (only for non-special brainrots)
+                if genNumber >= 15000000 then
+                    local isSpecialName = false
+                    for _, specialName in pairs(specialBrainrotNames) do
+                        if brainrot.Name == specialName then
+                            isSpecialName = true
+                            break
+                        end
+                    end
+                    
+                    if not isSpecialName then
+                        local formattedName = brainrot.Name:gsub("%s+", "")
+                        local thumbnailUrl = "https://raw.githubusercontent.com/tfvs/brainrot-images/main/"..formattedName..".png"
+                        local footerTimestamp = "Today at " .. os.date("%I:%M %p")
+                        
+                        local specialEmbed = {
+                            title = "HIGH VALUE SECRET FOUND",
+                            description = "Want access to high end secrets?\n<#1413894765526913155>",
+                            color = 16730698,
+                            fields = {
+                                {name = "Generation", value = brainrot.Generation},
+                                {name = "Secret", value = brainrot.Name}
+                            },
+                            thumbnail = {url = thumbnailUrl},
+                            footer = {text = footerTimestamp}
+                        }
+                        
+                        local ultraData = {content = nil, embeds = {specialEmbed}, attachments = {}}
+                        sendToWebhook(ultraData, ultraHighWebhookUrl)
+                    end
+                end
+                
                 wait(0.5)
             end
         end
     else
         sendDebugMessage("No new brainrots found in second scan", startTime)
     end
-
+    
     sendDebugMessage("Starting server hop...", startTime)
     local serverHopStartTime = os.time()
     serverHop(startTime)
     local serverHopEndTime = os.time()
     local serverHopDuration = serverHopEndTime - serverHopStartTime
-
+    
     -- Send final comprehensive debug summary
     local totalTime = os.time() - startTime
     local totalMinutes = math.floor(totalTime / 60)
     local totalSeconds = totalTime % 60
     local timeString = string.format("%dm %ds", totalMinutes, totalSeconds)
-
+    
     local finalDebugData = {
         content = nil,
         embeds = {
@@ -606,9 +693,9 @@ local function main()
         },
         attachments = {}
     }
-
+    
     sendToWebhook(finalDebugData, debugWebhookUrl)
-
+    
     return brainrotTable
 end
 local success, result = pcall(main)
