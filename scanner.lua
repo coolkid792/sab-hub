@@ -40,6 +40,33 @@ local normalWebhookBrainrots = {
     "Crabbo Limonetta"
 }
 
+-- Trait IDs for mapping
+local traitIds = {
+    [78474194088770] = "Rain",
+    [115664804212096] = "Matteo's Hat",
+    [99181785766598] = "Galactic",
+    [118283346037788] = "Fire",
+    [83627475909869] = "Snowy",
+    [100601425541874] = "Bubblegum",
+    [127455440418221] = "Starfall",
+    [121332433272976] = "Glitched",
+    [97725744252608] = "Bombardiro",
+    [89041930759464] = "Taco",
+    [104985313532149] = "Water",
+    [104229924295526] = "Nyan Cat",
+    [134655415681926] = "10B",
+    [121100427764858] = "Fireworks",
+    [82620342632406] = "Disco",
+    [75650816341229] = "Brazil",
+    [110723387483939] = "Evil Tung Tung",
+    [110910518481052] = "UFO",
+    [117478971325696] = "Spider",
+    [84731118566493] = "Strawberry",
+    [104964195846833] = "Crab",
+    [139729696247144] = "mygame43",
+    [115001117876534] = "Sleepy"
+}
+
 -- Debug helper (throttled)
 local __lastDebugAt = 0
 local function SendDebug(msg, attempts)
@@ -161,6 +188,30 @@ local function getFloorNumber(podium)
     return floorNum
 end
 
+-- Helper: extract traits
+local function extractTraits(animalOverhead)
+    local traits = animalOverhead:FindFirstChild("Traits")
+    if not traits then
+        return "None"
+    end
+    local traitList = {}
+    for _, child in pairs(traits:GetChildren()) do
+        if child:IsA("ImageLabel") and child.Image then
+            local imageId = child.Image:match("rbxassetid://(%d+)")
+            if imageId then
+                local traitId = tonumber(imageId)
+                if traitIds[traitId] then
+                    table.insert(traitList, traitIds[traitId])
+                end
+            end
+        end
+    end
+    if #traitList == 0 then
+        return "None"
+    end
+    return table.concat(traitList, ", ")
+end
+
 -- Check if brainrot should go to normal webhook
 local function shouldUseNormalWebhook(brainrotName)
     for _, normalName in ipairs(normalWebhookBrainrots) do
@@ -182,9 +233,12 @@ local function processPodium(podium, plotOwner, floorNum)
     local displayName = overhead:FindFirstChild("DisplayName")
     local generation = overhead:FindFirstChild("Generation")
     local rarity = overhead:FindFirstChild("Rarity")
+    local mutation = overhead:FindFirstChild("Mutation")
     if not (displayName and generation and rarity) then return end
 
     local name, gen, rarityValue = displayName.Text, generation.Text, rarity.Text
+    local mutationValue = mutation and mutation.Text or "None"
+    local traitsValue = extractTraits(overhead)
     local key = name.."|"..gen.."|"..rarityValue.."|"..game.JobId
 
     if sentBrainsGlobal[key] then return end
@@ -204,6 +258,8 @@ local function processPodium(podium, plotOwner, floorNum)
             {name="📜 Income", value=gen, inline=true},
             {name="👥 Player Count", value=playerCount, inline=true},
             {name="✨ Rarity", value=rarityValue, inline=true},
+            {name="🧬 Mutation", value=mutationValue, inline=true},
+            {name="🎭 Traits", value=traitsValue, inline=true},
             {name="☀️ Owner", value=plotOwner.." (Floor "..floorNum..")", inline=true},
             {name="🆔 Job ID", value="```"..jobId.."```"},
             {name="💻 Join Script", value="`game:GetService(\"TeleportService\"):TeleportToPlaceInstance("..PlaceID..",\""..jobId.."\",game.Players.LocalPlayer)\n`"},
