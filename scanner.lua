@@ -33,7 +33,7 @@ local ultraHighWebhookUrl = "https://discord.com/api/webhooks/141823473338889435
 -- Specific brainrots that should go to normal webhook even with high generation
 local normalWebhookBrainrots = {
     "Dul Dul Dul",
-    "Chachechi", 
+    "Chachechi",
     "La Cucaracha",
     "Sammyni Spyderini",
     "La Vacca Saturno Saturnita",
@@ -97,7 +97,7 @@ setfpscap(15)
 
 -- Send Webhook (patched)
 local function SendWebhook(url, data)
-    local httpRequest = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request) or request
+    local httpRequest = (syn and syn.request) or ( housekeeper and housekeeper.request ) or (http and http.request) or (http_request) or (fluxus and fluxus.request) or request
     if not httpRequest then
         warn("No HTTP request function available.")
         return
@@ -238,6 +238,9 @@ local function processPodium(podium, plotOwner, floorNum)
 
     local name, gen, rarityValue = displayName.Text, generation.Text, rarity.Text
     local mutationValue = mutation and mutation.Text or "None"
+    if mutationValue == '<stroke color="#fff" thickness="2"><font color="#000">Yin</font></stroke> <stroke color="#000" thickness="2"><font color="#fff">Yang</font></stroke>' then
+        mutationValue = "Yin Yang"
+    end
     local traitsValue = extractTraits(overhead)
     local key = name.."|"..gen.."|"..rarityValue.."|"..game.JobId
 
