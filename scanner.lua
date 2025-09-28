@@ -499,7 +499,7 @@ task.spawn(function()
     while true do
         SendDebug("Starting scan and hop cycle.")
         scanPlotsTwice() -- Complete the full scan (two passes with 4-second delay)
-        task.wait(12) -- Small buffer to ensure scanning is fully complete
+        task.wait(5) -- Small buffer to ensure scanning is fully complete
         SendDebug("Initiating server hops.")
         hopToNewServer() -- Hop to a new server after scanning
         task.wait(2) -- Small delay before starting the next cycle
