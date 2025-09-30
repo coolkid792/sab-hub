@@ -237,13 +237,13 @@ local function processPodium(podium, plotOwner, floorNum)
     if not (displayName and generation and rarity) then return end
 
     local name, gen, rarityValue = displayName.Text, generation.Text, rarity.Text
-local mutationValue = "None"
-if mutation and mutation.Visible and mutation.Text then
-    mutationValue = mutation.Text
-    if mutationValue == '<stroke color="#fff" thickness="2"><font color="#000">Yin</font></stroke> <stroke color="#000" thickness="2"><font color="#fff">Yang</font></stroke>' then
-        mutationValue = "Yin Yang"
+    local mutationValue = "None"
+    if mutation and mutation.Visible and mutation.Text then
+        mutationValue = mutation.Text
+        if mutationValue == '<stroke color="#fff" thickness="2"><font color="#000">Yin</font></stroke> <stroke color="#000" thickness="2"><font color="#fff">Yang</font></stroke>' then
+            mutationValue = "Yin Yang"
+        end
     end
-end
     local traitsValue = extractTraits(overhead)
     local key = name.."|"..gen.."|"..rarityValue.."|"..game.JobId
 
@@ -380,11 +380,11 @@ statusLabel.TextColor3 = Color3.new(0,0,0)
 statusLabel.TextScaled = true
 statusLabel.BackgroundTransparency = 1
 
--- Fetch servers via Cloudflare proxy (single call, retries on failure)
+-- Fetch servers via Vercel proxy (single call, retries on failure)
 local function getServers()
     local servers = {}
     local maxAttempts = 3
-    local proxyBase = "https://lingering-smoke-afa1.aarislmao827.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
+    local proxyBase = "https://api-seven-omega-11.vercel.app/api/servers?placeId=" .. PlaceID .. "&jobId=" .. (game.JobId or "")
 
     for attempt = 1, maxAttempts do
         -- jitter to de-sync across instances
@@ -409,13 +409,13 @@ local function getServers()
                         table.insert(servers, server)
                     end
                 end
-                SendDebug("Fetched "..#servers.." joinable servers via proxy")
+                SendDebug("Fetched "..#servers.." joinable servers via Vercel proxy")
                 return servers
             else
-                SendDebug("Failed to parse proxy response on attempt "..attempt)
+                SendDebug("Failed to parse Vercel proxy response on attempt "..attempt)
             end
         else
-            SendDebug("Failed to fetch from proxy on attempt "..attempt)
+            SendDebug("Failed to fetch from Vercel proxy on attempt "..attempt)
         end
 
         if attempt < maxAttempts then
@@ -423,7 +423,7 @@ local function getServers()
         end
     end
 
-    SendDebug("Proxy fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
+    SendDebug("Vercel proxy fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
     return servers
 end
 
