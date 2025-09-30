@@ -121,7 +121,7 @@ local function SendMessageEMBED(urls, embed)
     for _, url in ipairs(urls) do
         local embedCopy = table.clone(embed)
         if url == zzzHubWebhook then
-            embedCopy.footer = {text = "zzz hub x gg/brainrotfinder"}
+            embedCopy.footer = {text = "zzzz hub x gg/brainrotfinder"}
             embedCopy.author = embedCopy.author or {}
             embedCopy.author.url = "https://discord.gg/brainrotfinder"
         end
