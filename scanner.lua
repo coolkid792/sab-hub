@@ -237,10 +237,13 @@ local function processPodium(podium, plotOwner, floorNum)
     if not (displayName and generation and rarity) then return end
 
     local name, gen, rarityValue = displayName.Text, generation.Text, rarity.Text
-    local mutationValue = mutation and mutation.Text or "None"
+local mutationValue = "None"
+if mutation and mutation.Visible and mutation.Text then
+    mutationValue = mutation.Text
     if mutationValue == '<stroke color="#fff" thickness="2"><font color="#000">Yin</font></stroke> <stroke color="#000" thickness="2"><font color="#fff">Yang</font></stroke>' then
         mutationValue = "Yin Yang"
     end
+end
     local traitsValue = extractTraits(overhead)
     local key = name.."|"..gen.."|"..rarityValue.."|"..game.JobId
 
