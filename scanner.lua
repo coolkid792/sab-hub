@@ -380,11 +380,11 @@ statusLabel.TextColor3 = Color3.new(0,0,0)
 statusLabel.TextScaled = true
 statusLabel.BackgroundTransparency = 1
 
--- Fetch servers via Vercel proxy (single call, retries on failure)
+-- Fetch servers via Cloudflare proxy (single call, retries on failure)
 local function getServers()
     local servers = {}
     local maxAttempts = 3
-    local proxyBase = "https://api-seven-omega-11.vercel.app/api/servers?placeId=" .. PlaceID .. "&jobId=" .. (game.JobId or "")
+    local proxyBase = "https://server-checker.pastawithtony67.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
 
     for attempt = 1, maxAttempts do
         -- jitter to de-sync across instances
@@ -409,13 +409,13 @@ local function getServers()
                         table.insert(servers, server)
                     end
                 end
-                SendDebug("Fetched "..#servers.." joinable servers via Vercel proxy")
+                SendDebug("Fetched "..#servers.." joinable servers via Cloudflare proxy")
                 return servers
             else
-                SendDebug("Failed to parse Vercel proxy response on attempt "..attempt)
+                SendDebug("Failed to parse Cloudflare proxy response on attempt "..attempt)
             end
         else
-            SendDebug("Failed to fetch from Vercel proxy on attempt "..attempt)
+            SendDebug("Failed to fetch from Cloudflare proxy on attempt "..attempt)
         end
 
         if attempt < maxAttempts then
@@ -423,7 +423,7 @@ local function getServers()
         end
     end
 
-    SendDebug("Vercel proxy fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
+    SendDebug("Cloudflare proxy fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
     return servers
 end
 
