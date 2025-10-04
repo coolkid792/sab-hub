@@ -19,6 +19,9 @@ local serverRetryCounts = {}
 local currentServerList = {}
 local sentBrainsGlobal = {}
 local decalsyeeted = true
+local webhookMessageCache = {} -- Cache to track sent webhook messages
+local lastScanTime = 0 -- Prevent rapid scanning
+local scanCooldown = 10 -- Minimum seconds between scans
 
 -- Jitter seed per instance
 math.randomseed(LocalPlayer.UserId + os.time())
@@ -95,6 +98,102 @@ end
 
 setfpscap(15)
 
+-- Periodic cleanup of webhook message cache
+task.spawn(function()
+    while true do
+        task.wait(300) -- Clean every 5 minutes
+        local currentTime = tick()
+        local cleaned = 0
+        for key, timestamp in pairs(webhookMessageCache) do
+            if currentTime - timestamp > 120 then -- Remove entries older than 2 minutes
+                webhookMessageCache[key] = nil
+                cleaned = cleaned + 1
+            end
+        end
+        if cleaned > 0 then
+            SendDebug("Cleaned " .. cleaned .. " old webhook cache entries")
+        end
+    end
+end)
+
+-- Railway-based duplicate prevention using external service
+local function wasWebhookRecentlySent(webhookUrl, embedContent)
+    local currentTime = tick()
+    
+    -- Extract brainrot name and generation from embed
+    local embedData = HttpService:JSONDecode(embedContent)
+    local brainrotName = "Unknown"
+    local generation = "Unknown"
+    
+    if embedData.description then
+        local nameMatch = embedData.description:match("🧠 ([^|]+)")
+        local genMatch = embedData.description:match("💰 ([^|]+)")
+        if nameMatch then brainrotName = nameMatch:gsub("^%s*(.-)%s*$", "%1") end
+        if genMatch then generation = genMatch:gsub("^%s*(.-)%s*$", "%1") end
+    end
+    
+    local serverId = game.JobId or "unknown"
+    
+    -- Check Railway duplicate service
+    local success, response = pcall(function()
+        local duplicateServiceUrl = "https://brainrot-duplicate-checker-production.up.railway.app/check-duplicate"
+        local requestData = {
+            brainrotName = brainrotName,
+            generation = generation,
+            serverId = serverId,
+            timestamp = currentTime,
+            webhookUrl = webhookUrl
+        }
+        
+        -- Use exploit request function (same as your working test)
+        local httpRequest = (syn and syn.request) or (housekeeper and housekeeper.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request) or request
+        
+        if httpRequest then
+            local result = httpRequest({
+                Url = duplicateServiceUrl,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json",
+                    ["User-Agent"] = "RobloxScript"
+                },
+                Body = HttpService:JSONEncode(requestData)
+            })
+            return result.Body -- Return the response body
+        else
+            -- Fallback to HttpService
+            return game:HttpPost(duplicateServiceUrl, HttpService:JSONEncode(requestData), Enum.HttpContentType.ApplicationJson)
+        end
+    end)
+    
+    if success and response then
+        local ok, result = pcall(function()
+            return HttpService:JSONDecode(response)
+        end)
+        
+        if ok and result then
+            if result.isDuplicate then
+                SendDebug("Duplicate brainrot detected via Railway: " .. brainrotName .. " (" .. generation .. ")")
+                return true
+            end
+            SendDebug("Railway: New brainrot allowed - " .. brainrotName .. " (" .. generation .. ")")
+        else
+            SendDebug("Failed to parse Railway response: " .. tostring(response))
+        end
+    else
+        SendDebug("Railway duplicate check failed, using local fallback")
+        
+        -- Local fallback cache
+        local cacheKey = brainrotName .. "|" .. generation .. "|" .. serverId
+        if webhookMessageCache[cacheKey] and (currentTime - webhookMessageCache[cacheKey]) < 120 then
+            SendDebug("Duplicate brainrot detected locally (fallback): " .. brainrotName .. " (" .. generation .. ")")
+            return true
+        end
+        webhookMessageCache[cacheKey] = currentTime
+    end
+    
+    return false
+end
+
 -- Send Webhook (patched)
 local function SendWebhook(url, data)
     local httpRequest = (syn and syn.request) or ( housekeeper and housekeeper.request ) or (http and http.request) or (http_request) or (fluxus and fluxus.request) or request
@@ -118,18 +217,32 @@ end
 
 -- Send embed message
 local function SendMessageEMBED(urls, embed)
-    for _, url in ipairs(urls) do
+    for i, url in ipairs(urls) do
         local embedCopy = table.clone(embed)
         if url == zzzHubWebhook then
             embedCopy.footer = {text = "zzzz hub x gg/brainrotfinder"}
             embedCopy.author = embedCopy.author or {}
             embedCopy.author.url = "https://discord.gg/brainrotfinder"
         end
-        local data = {
-            embeds = {embedCopy},
-            content = embedCopy.ping and "<@&1414643713426194552>" or nil
-        }
-        SendWebhook(url, data)
+        
+        -- Create a unique content hash for duplicate checking
+        local embedContent = HttpService:JSONEncode(embedCopy)
+        
+        -- Check if this exact embed was sent recently to this webhook
+        if not wasWebhookRecentlySent(url, embedContent) then
+            local data = {
+                embeds = {embedCopy},
+                content = embedCopy.ping and "<@&1414643713426194552>" or nil
+            }
+            SendWebhook(url, data)
+        else
+            SendDebug("Skipping duplicate webhook message to " .. url:match("webhooks/(%d+)"))
+        end
+        
+        -- Small delay between webhook sends to prevent rate limiting
+        if i < #urls then
+            task.wait(0.1)
+        end
     end
 end
 
@@ -245,10 +358,15 @@ local function processPodium(podium, plotOwner, floorNum)
         end
     end
     local traitsValue = extractTraits(overhead)
-    local key = name.."|"..gen.."|"..rarityValue.."|"..game.JobId
-
-    if sentBrainsGlobal[key] then return end
-    sentBrainsGlobal[key] = true
+    
+    -- Remove local duplicate checking - Railway handles this now
+    -- local currentTime = math.floor(tick())
+    -- local key = name.."|"..gen.."|"..rarityValue.."|"..game.JobId.."|"..currentTime
+    -- local recentKey = name.."|"..gen.."|"..rarityValue.."|"..game.JobId
+    -- if sentBrainsGlobal[recentKey] and (currentTime - sentBrainsGlobal[recentKey]) < 30 then 
+    --     return 
+    -- end
+    -- sentBrainsGlobal[recentKey] = currentTime
 
     local numberMatch = gen:match("(%d+%.?%d*)")
     local genNumber = tonumber(numberMatch) or 0
@@ -310,13 +428,30 @@ local function processPodium(podium, plotOwner, floorNum)
             footer = {text = footerTimestamp}
         }
 
-        local data = {content = nil, embeds = {specialEmbed}, attachments = {}}
-        SendWebhook(ultraHighWebhookUrl, data)
+        -- Check if ultra high webhook was recently sent
+        local ultraEmbedContent = HttpService:JSONEncode(specialEmbed)
+        if not wasWebhookRecentlySent(ultraHighWebhookUrl, ultraEmbedContent) then
+            local data = {content = nil, embeds = {specialEmbed}, attachments = {}}
+            SendWebhook(ultraHighWebhookUrl, data)
+        else
+            SendDebug("Skipping duplicate ultra high webhook message")
+        end
     end
 end
 
--- Scan plots only twice (short delay)
-local function scanPlotsTwice()
+-- Scan plots multiple times to ensure all brainrots are detected
+local function scanPlotsMultiple()
+    local currentTime = tick()
+    
+    -- Check scan cooldown
+    if currentTime - lastScanTime < scanCooldown then
+        local remainingTime = scanCooldown - (currentTime - lastScanTime)
+        SendDebug("Scan cooldown active. Waiting " .. math.ceil(remainingTime) .. " more seconds.")
+        return
+    end
+    
+    lastScanTime = currentTime
+    
     local function scanOnce()
         local plotsFolder = Workspace:FindFirstChild("Plots")
         if not plotsFolder then SendDebug("Plots folder not found.") return 0 end
@@ -335,9 +470,22 @@ local function scanPlotsTwice()
         return found
     end
 
-    SendDebug("Starting first scan.")
-    scanOnce()
-    SendDebug("Finished scanning plots.")
+    -- Perform multiple scans with delays to catch all brainrots
+    SendDebug("Starting comprehensive scan (3 passes).")
+    local totalFound = 0
+    
+    -- First scan - immediate
+    totalFound = totalFound + scanOnce()
+    task.wait(1) -- Wait for any delayed loading
+    
+    -- Second scan - after brief delay
+    totalFound = totalFound + scanOnce()
+    task.wait(2) -- Wait longer for slower loading
+    
+    -- Third scan - final check
+    totalFound = totalFound + scanOnce()
+    
+    SendDebug("Comprehensive scan completed. Total podiums processed: "..totalFound)
 end
 
 -- Lightweight workspace optimization (fast on multi-instance)
@@ -501,10 +649,10 @@ end)
 task.spawn(function()
     while true do
         SendDebug("Starting scan and hop cycle.")
-        scanPlotsTwice() -- Complete the full scan (two passes with 4-second delay)
-        task.wait(5) -- Small buffer to ensure scanning is fully complete
+        scanPlotsMultiple() -- Complete comprehensive scan (3 passes with delays)
+        task.wait(3) -- Buffer to ensure all webhooks are sent
         SendDebug("Initiating server hops.")
         hopToNewServer() -- Hop to a new server after scanning
-        task.wait(2) -- Small delay before starting the next cycle
+        task.wait(3) -- Delay before starting the next cycle
     end
 end)
