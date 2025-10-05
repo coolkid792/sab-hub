@@ -70,22 +70,45 @@ local traitIds = {
     [115001117876534] = "Sleepy"
 }
 
--- Debug helper (throttled)
-local __lastDebugAt = 0
-local function SendDebug(msg, attempts)
-    if tick() - __lastDebugAt < 2 then return end
-    __lastDebugAt = tick()
+-- Debug log collection system
+local debugLogs = {}
+local lastTeleportTime = 0
+
+local function AddDebugLog(msg)
+    local timestamp = os.date("%H:%M:%S")
+    table.insert(debugLogs, "[" .. timestamp .. "] " .. msg)
+    
+    -- Keep only last 15 logs to prevent message from getting too long
+    if #debugLogs > 15 then
+        table.remove(debugLogs, 1)
+    end
+end
+
+local function SendDebugLogs(attempts)
+    if #debugLogs == 0 then return end
+    
     local elapsedTime = math.floor(tick() - startTime)
     local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId="..LocalPlayer.UserId.."&width=150&height=150&format=png"
+    
+    -- Check if stuck teleporting for 300+ seconds
+    local shouldPing = false
+    if isTeleporting and (tick() - lastTeleportTime) > 300 then
+        shouldPing = true
+    end
+    
+    local combinedLogs = table.concat(debugLogs, "\n")
     local data = {
+        content = shouldPing and "@everyone" or nil,
         embeds = {{
-            description = msg,
-            color = 0xFFFFFF,
+            title = shouldPing and "🚨 STUCK TELEPORTING - NEEDS HELP" or "📊 Scan & Hop Report",
+            description = "```\n" .. combinedLogs .. "\n```",
+            color = shouldPing and 0xFF0000 or 0xFFFFFF,
             author = {name = LocalPlayer.Name, icon_url = avatarUrl},
             footer = {text = "⏰ "..elapsedTime.."s | Teleport Attempts: "..(attempts or teleportFailureCount)},
             timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
         }}
     }
+    
     pcall(function()
         request({
             Url = debugWebhookUrl,
@@ -94,6 +117,14 @@ local function SendDebug(msg, attempts)
             Body = HttpService:JSONEncode(data)
         })
     end)
+    
+    -- Clear logs after sending
+    debugLogs = {}
+end
+
+-- Debug helper (collects logs instead of sending immediately)
+local function SendDebug(msg, attempts)
+    AddDebugLog(msg)
 end
 
 setfpscap(15)
@@ -480,7 +511,7 @@ local function scanPlotsMultiple()
     
     -- Second scan - after brief delay
     totalFound = totalFound + scanOnce()
-    task.wait(2) -- Wait longer for slower loading
+    task.wait(8) -- Wait longer for slower loading
     
     -- Third scan - final check
     totalFound = totalFound + scanOnce()
@@ -528,15 +559,16 @@ statusLabel.TextColor3 = Color3.new(0,0,0)
 statusLabel.TextScaled = true
 statusLabel.BackgroundTransparency = 1
 
--- Fetch servers via Cloudflare proxy (single call, retries on failure)
+-- Fetch servers via Cloudflare proxy with fallback to direct Roblox API
 local function getServers()
     local servers = {}
     local maxAttempts = 3
-    local proxyBase = "https://lingering-smoke-afa1.aarislmao827.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
+    local proxyBase = "https://spring-leaf-5b44.macaroniwithtony67.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
 
+    -- Try Cloudflare proxy first
     for attempt = 1, maxAttempts do
-        -- jitter to de-sync across instances
-        task.wait(0.05 + (LocalPlayer.UserId % 6) * 0.03 + math.random() * 0.07)
+        -- Increased jitter to spread requests better
+        task.wait(0.1 + (LocalPlayer.UserId % 10) * 0.05 + math.random() * 0.1)
 
         local success, response = pcall(function()
             return game:HttpGet(proxyBase)
@@ -557,8 +589,12 @@ local function getServers()
                         table.insert(servers, server)
                     end
                 end
-                SendDebug("Fetched "..#servers.." joinable servers via Cloudflare proxy")
-                return servers
+                if #servers > 0 then
+                    SendDebug("Fetched "..#servers.." joinable servers via Cloudflare proxy")
+                    return servers
+                else
+                    SendDebug("Cloudflare proxy returned 0 valid servers on attempt "..attempt)
+                end
             else
                 SendDebug("Failed to parse Cloudflare proxy response on attempt "..attempt)
             end
@@ -571,14 +607,63 @@ local function getServers()
         end
     end
 
-    SendDebug("Cloudflare proxy fetch failed after "..maxAttempts.." attempts, falling back to 0 servers")
+    -- Fallback: Try direct Roblox API if Cloudflare fails
+    SendDebug("Cloudflare proxy failed, trying direct Roblox API as fallback")
+    local fallbackUrl = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=50"
+    
+    for attempt = 1, 2 do
+        task.wait(0.2 + math.random() * 0.3) -- Small delay for fallback
+        
+        local success, response = pcall(function()
+            return game:HttpGet(fallbackUrl)
+        end)
+        
+        if success and response ~= "" then
+            local ok, data = pcall(function()
+                return HttpService:JSONDecode(response)
+            end)
+            
+            if ok and data and data.data and type(data.data) == "table" then
+                for _, server in ipairs(data.data) do
+                    if tonumber(server.playing)
+                        and tonumber(server.maxPlayers)
+                        and server.playing < server.maxPlayers - 1
+                        and server.id
+                        and server.id ~= game.JobId then
+                        table.insert(servers, server)
+                    end
+                end
+                if #servers > 0 then
+                    SendDebug("Fallback: Fetched "..#servers.." joinable servers via direct Roblox API")
+                    return servers
+                end
+            end
+        end
+        
+        if attempt < 2 then
+            task.wait(1)
+        end
+    end
+
+    -- If still no servers, wait and retry the whole process
+    if #servers == 0 then
+        SendDebug("All server fetch methods failed, waiting 5-10 seconds before retry")
+        task.wait(5 + math.random() * 5)
+        return getServers() -- Recursive retry
+    end
+    
     return servers
 end
 
 -- Server hopping with random selection & fast retry
 local function hopToNewServer()
     if isTeleporting then SendDebug("Already teleporting") return end
+    
+    -- Send collected debug logs before hopping
+    SendDebugLogs(teleportFailureCount)
+    
     isTeleporting = true
+    lastTeleportTime = tick() -- Track when teleport started
     teleportFailureCount = 0
 
     if #currentServerList == 0 then
