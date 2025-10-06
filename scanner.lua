@@ -563,7 +563,7 @@ statusLabel.BackgroundTransparency = 1
 local function getServers()
     local servers = {}
     local maxAttempts = 3
-    local proxyBase = "https://spring-leaf-5b44.macaroniwithtony67.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
+    local proxyBase = "https://shiny-mode-7ff9.pastawithtony67.workers.dev/servers/" .. PlaceID .. "?excludeJobId=" .. (game.JobId or "")
 
     -- Try Cloudflare proxy first
     for attempt = 1, maxAttempts do
