@@ -429,10 +429,10 @@ local function processPodium(podium, plotOwner, floorNum)
     if shouldUseNormalWebhook(name) then
         embed.color = 0xFFFFFF
         SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
-    elseif genNumber >= 15e6 then
+    elseif genNumber >= 22e6 then
         embed.color, embed.ping = 0xFF0000, true
         SendMessageEMBED({highValueWebhookUrl}, embed)
-    elseif genNumber >= 5e6 then
+    elseif genNumber >= 10e6 then
         embed.color = 0xFFA500
         SendMessageEMBED({highValueWebhookUrl}, embed)
     else
