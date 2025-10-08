@@ -427,7 +427,7 @@ local function processPodium(podium, plotOwner, floorNum)
     if shouldUseNormalWebhook(name) then
         embed.color = 0xFFFFFF
         SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
-    elseif genNumber >= 20e6 then
+    elseif genNumber >= 15e6 then
         embed.color, embed.ping = 0xFF0000, true
         SendMessageEMBED({highValueWebhookUrl}, embed)
     elseif genNumber >= 5e6 then
@@ -439,7 +439,7 @@ local function processPodium(podium, plotOwner, floorNum)
     end
 
     -- Ultra high value special embed (only for non-normal webhook brainrots)
-    if genNumber >= 22e6 and not shouldUseNormalWebhook(name) then
+    if genNumber >= 15e6 and not shouldUseNormalWebhook(name) then
         local formattedName = name:gsub("%s+", "")
         local thumbnailUrl = "https://raw.githubusercontent.com/tfvs/brainrot-images/main/"..formattedName..".png"
 
