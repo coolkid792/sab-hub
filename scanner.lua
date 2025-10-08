@@ -441,7 +441,7 @@ local function processPodium(podium, plotOwner, floorNum)
     end
 
     -- Ultra high value special embed (only for non-normal webhook brainrots)
-    if genNumber >= 15e6 and not shouldUseNormalWebhook(name) then
+    if genNumber >= 22e6 and not shouldUseNormalWebhook(name) then
         local formattedName = name:gsub("%s+", "")
         local thumbnailUrl = "https://raw.githubusercontent.com/tfvs/brainrot-images/main/"..formattedName..".png"
 
