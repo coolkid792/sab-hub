@@ -127,8 +127,6 @@ local function SendDebug(msg, attempts)
     AddDebugLog(msg)
 end
 
-setfpscap(15)
-
 -- Periodic cleanup of webhook message cache
 task.spawn(function()
     while true do
@@ -429,10 +427,10 @@ local function processPodium(podium, plotOwner, floorNum)
     if shouldUseNormalWebhook(name) then
         embed.color = 0xFFFFFF
         SendMessageEMBED({webhookUrl, zzzHubWebhook}, embed)
-    elseif genNumber >= 22e6 then
+    elseif genNumber >= 20e6 then
         embed.color, embed.ping = 0xFF0000, true
         SendMessageEMBED({highValueWebhookUrl}, embed)
-    elseif genNumber >= 10e6 then
+    elseif genNumber >= 5e6 then
         embed.color = 0xFFA500
         SendMessageEMBED({highValueWebhookUrl}, embed)
     else
